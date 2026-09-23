@@ -1,0 +1,15 @@
+# Test profile: the datasource is supplied by Testcontainers (@ServiceConnection); these values
+# only exist so the ${...} placeholders in application.yml never need real environment variables.
+spring:
+  datasource:
+    url: jdbc:postgresql://replaced-by-testcontainers/jobtrack
+    username: test
+    password: test
+
+jobtrack:
+  jwt:
+    # Test-only key, never used outside the automated tests.
+    secret: test-secret-key-that-is-at-least-32-bytes-long-000
+    expiration-minutes: 60
+  cors:
+    allowed-origins: http://localhost:5173

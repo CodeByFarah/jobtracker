@@ -31,6 +31,10 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
     @EntityGraph(attributePaths = "company")
     List<JobApplication> findByCompanyIdAndUserIdOrderByUpdatedAtDesc(Long companyId, Long userId);
 
+    /** Applications in the given statuses, with their company, e.g. the still-open ones for the email sync. */
+    @EntityGraph(attributePaths = "company")
+    List<JobApplication> findByUserIdAndStatusIn(Long userId, Collection<ApplicationStatus> statuses);
+
     boolean existsByCompanyId(Long companyId);
 
     long countByCompanyId(Long companyId);

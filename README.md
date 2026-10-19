@@ -133,6 +133,83 @@ indexes on `company_id`, `application_id` and `tasks.due_date`. The schema is in
 
 More detail and the reasoning behind these choices: [docs/engineering-decisions.md](docs/engineering-decisions.md).
 
+## AI features (local and free)
+
+Two features use a small open-source model, **Qwen3-4B**, running on your own machine through
+[Ollama](https://ollama.com). There is no API key, no per-request cost, and job pages and emails
+never go to a third-party AI service.
+
+- **Add from link.** Paste a job posting URL and the form fills itself in: title, company, location,
+  employment type, salary and a short summary. Most job boards embed a schema.org `JobPosting`
+  object, which is read directly (instant and exact); the AI only reads the page text when that is
+  missing. Nothing is saved until you check the values and click *Add application*.
+- **Gmail tracking.** Connect Gmail (read-only) on the Profile page. Every 30 minutes, and on
+  *Check now*, new emails are fetched; those that mention the company of one of your open
+  applications are read by the AI, which decides what each one means:
+
+  | Email | Application moves to |
+  |---|---|
+  | Application received | Applied |
+  | Assessment / take-home / online test | Screening |
+  | Interview invite or scheduling | Interview |
+  | Offer | Offer |
+  | Rejection, "position filled" | Rejected |
+  | Job alerts, newsletters, anything else | (no change) |
+
+  Statuses only move forward along the normal workflow, and only when the model is at least 60%
+  confident. Every email the AI read is listed on its application with the AI's one-line summary and
+  the status change it made, so a wrong call is easy to spot and undo by hand.
+- **No reply.** An application still *Applied* or *Screening* with no news for 14 days gets a
+  *No reply* badge.
+
+How it fits together (`backend/src/main/java/com/jobtrack`):
+
+| Package | Responsibility |
+|---|---|
+| `ai` | `OllamaClient` (JSON-schema constrained answers), `JobPostingParser` (schema.org data), `JobLinkImportService` |
+| `gmail` | OAuth (`GmailConnectionService`, signed `OAuthStateSigner`, AES-GCM `TokenCipher` for the stored refresh token), `GmailApiClient` (plain REST, no Google SDK), `CompanyMatcher` pre-filter, `EmailClassifier`, `EmailStatusRules`, `EmailSyncService` + scheduler |
+
+Emails are processed oldest-first on a single background worker (the local model handles one request
+at a time). Each processed message id is stored, so nothing is read twice, and a failed sync doesn't
+move the "read up to" mark, so it is retried. Expect roughly 10–25 seconds per job-related email on a
+laptop CPU; unrelated emails are skipped before they reach the AI.
+
+### Setting up the local AI
+
+1. Install Ollama (Windows: `winget install Ollama.Ollama`) and start it.
+2. `ollama pull qwen3:4b-instruct-2507-q4_K_M` (2.5 GB).
+3. Optional: point to another model or server with `OLLAMA_MODEL` / `OLLAMA_URL` in `.env`.
+
+### Setting up Gmail (one-time, ~10 minutes)
+
+Gmail access needs an OAuth client of your own in Google Cloud. It is free.
+
+1. Open <https://console.cloud.google.com>, create a project (e.g. "JobTrack").
+2. *APIs & Services → Library*: enable the **Gmail API**.
+3. *Google Auth Platform → Branding* (OAuth consent screen): app name "JobTrack", your email as
+   support and developer contact. Audience: **External**, and add your Gmail address under
+   **Test users**.
+4. *Data access*: add the scope `https://www.googleapis.com/auth/gmail.readonly`.
+5. *Clients → Create client*: type **Web application**, authorised redirect URI
+   `http://localhost:5173/api/gmail/oauth/callback` (it goes through the Vite dev server's `/api`
+   proxy, so it works whatever port the backend uses).
+6. Copy the client id and secret into `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`,
+   restart the backend, and click **Connect Gmail** on the Profile page.
+
+While the app is in Google's *Testing* mode, Google expires the access after 7 days; JobTrack then
+shows "reconnect" on the Profile page. Publishing the app (no verification is needed for your own
+use, but Google shows an "unverified app" warning) removes that limit.
+
+### Testing the AI against the real model
+
+```bash
+cd backend
+./mvnw test -Dtest=EmailClassifierLiveTest -Dollama.live=true
+```
+
+Runs eight realistic emails (rejection, interview, job alert, assessment, offer, ...) through the
+local model and checks each answer. It is skipped in the normal test run because it needs Ollama.
+
 ## Testing
 
 ```bash
@@ -148,11 +225,16 @@ No local database or configuration is needed.
 | Unit tests (JUnit 5 + Mockito) | Status transitions and history, application creation and update, validation rules, ownership (not-found for foreign ids), company creation, duplicate names and deletion rules, interview date rules, task completion, dashboard calculations (zero-filling, time zones), registration and login. |
 | Integration tests (`@SpringBootTest` + MockMvc + Testcontainers) | The full acceptance workflow (register → … → dashboard → search). User A vs. user B on every resource type. Page size, page number and filters combined with pagination. Sorting. Validation and error bodies. Transaction rollback when the history insert fails. |
 
-94 tests; all pass.
+125 tests; all pass (plus the opt-in live AI test described under *AI features*).
 
 ## Setup
 
 **Prerequisites:** Java 21, Node.js 20+ and Docker. Maven isn't needed because the Maven wrapper is included.
+For the AI features, also Ollama (see *AI features*).
+
+**Windows shortcut:** after step 1, `powershell -ExecutionPolicy Bypass -File .\dev.ps1` starts the
+database, backend and frontend in one go. If ports 5432 or 8080 are already taken by another project,
+set `DB_PORT` / `SERVER_PORT` in `.env` (and `VITE_API_PROXY_TARGET` in `frontend/.env.local`).
 
 ### 1. Configure the environment
 
@@ -236,6 +318,13 @@ Endpoint overview. Everything except register and login requires a bearer token.
 | PUT / DELETE | `/api/tasks/{id}` | Update / delete a task |
 | PATCH | `/api/tasks/{id}/completion` | Mark done / reopen |
 | GET | `/api/dashboard` | Statistics (`timezone=Europe/London`) |
+| POST | `/api/applications/import-link` | Read job details from a posting URL (nothing is saved) |
+| GET | `/api/applications/{id}/emails` | Emails the AI matched to an application |
+| GET / DELETE | `/api/gmail` | Gmail connection and sync status / disconnect |
+| GET | `/api/gmail/connect-url` | Google sign-in URL |
+| GET | `/api/gmail/oauth/callback` | Called by Google after sign-in (public; uses the signed `state`) |
+| POST | `/api/gmail/sync` | Check Gmail now (runs in the background, 202) |
+| GET | `/api/gmail/events` | Recent emails matched to applications |
 
 Errors always have the same shape:
 

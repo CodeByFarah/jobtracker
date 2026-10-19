@@ -4,6 +4,7 @@ import { ApplicationCard, ApplicationListHeader } from '../components/Applicatio
 import { FilterPanel } from '../components/FilterPanel'
 import { DEFAULT_FILTERS, type ApplicationFilters } from '../utils/filters'
 import { ApplicationFormModal } from '../components/forms/ApplicationFormModal'
+import { ImportLinkModal } from '../components/forms/ImportLinkModal'
 import { Icon } from '../components/Icon'
 import { Pagination } from '../components/Pagination'
 import { SearchBar } from '../components/SearchBar'
@@ -12,7 +13,7 @@ import { useAsync } from '../hooks/useAsync'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { applicationApi, type ApplicationSort } from '../services/api'
-import type { ApplicationStatus, EmploymentType } from '../types/api'
+import type { ApplicationStatus, EmploymentType, JobLinkPreview } from '../types/api'
 
 const PAGE_SIZE = 10
 
@@ -25,6 +26,8 @@ export function ApplicationsPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [creating, setCreating] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [prefill, setPrefill] = useState<JobLinkPreview | undefined>(undefined)
 
   const filters: ApplicationFilters = {
     status: (params.get('status') ?? '') as ApplicationStatus | '',
@@ -90,9 +93,14 @@ export function ApplicationsPage() {
             {data ? `${data.totalElements} ${hasFilters ? 'matching' : 'in total'}` : 'Every job you’re tracking'}
           </p>
         </div>
-        <button type="button" className="button button-primary" onClick={() => setCreating(true)}>
-          <Icon name="plus" /> New application
-        </button>
+        <div className="header-actions">
+          <button type="button" className="button button-secondary" onClick={() => setImporting(true)}>
+            <Icon name="link" /> Add from link
+          </button>
+          <button type="button" className="button button-primary" onClick={() => setCreating(true)}>
+            <Icon name="plus" /> New application
+          </button>
+        </div>
       </header>
 
       <div className="toolbar">
@@ -136,9 +144,24 @@ export function ApplicationsPage() {
         </div>
       )}
 
+      {importing && (
+        <ImportLinkModal
+          onClose={() => setImporting(false)}
+          onImported={(preview) => {
+            setImporting(false)
+            setPrefill(preview)
+            setCreating(true)
+          }}
+        />
+      )}
+
       {creating && (
         <ApplicationFormModal
-          onClose={() => setCreating(false)}
+          prefill={prefill}
+          onClose={() => {
+            setCreating(false)
+            setPrefill(undefined)
+          }}
           onSaved={(application) => navigate(`/applications/${application.id}`)}
         />
       )}

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { FormField } from '../components/FormField'
+import { GmailCard } from '../components/GmailCard'
 import { nullIfBlank } from '../utils/form'
 import { useAuth } from '../hooks/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -67,6 +68,7 @@ export function ProfilePage() {
           </div>
         </form>
       </section>
+      <GmailCard />
     </>
   )
 }

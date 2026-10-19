@@ -6,9 +6,12 @@ import type {
   Company,
   CompanyInput,
   Dashboard,
+  EmailEvent,
   EmploymentType,
+  GmailStatus,
   Interview,
   InterviewInput,
+  JobLinkPreview,
   Page,
   StatusHistoryEntry,
   Task,
@@ -66,6 +69,17 @@ export const applicationApi = {
     http.post<Interview>(`/api/applications/${id}/interviews`, body),
   tasks: (id: number) => http.get<Task[]>(`/api/applications/${id}/tasks`),
   createTask: (id: number, body: TaskInput) => http.post<Task>(`/api/applications/${id}/tasks`, body),
+  emails: (id: number) => http.get<EmailEvent[]>(`/api/applications/${id}/emails`),
+  /** Reads job details from a posting link with the local AI. Can take up to a minute. */
+  importLink: (url: string) => http.post<JobLinkPreview>('/api/applications/import-link', { url }),
+}
+
+export const gmailApi = {
+  status: () => http.get<GmailStatus>('/api/gmail'),
+  connectUrl: () => http.get<{ url: string }>('/api/gmail/connect-url'),
+  sync: () => http.post<GmailStatus>('/api/gmail/sync'),
+  disconnect: () => http.delete('/api/gmail'),
+  events: (limit = 20) => http.get<EmailEvent[]>(`/api/gmail/events${buildQuery({ limit })}`),
 }
 
 export const interviewApi = {

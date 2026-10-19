@@ -169,6 +169,69 @@ export interface Dashboard {
   upcomingTasks: Task[]
 }
 
+/** Job details read from a posting link; nothing is saved until the user submits the form. */
+export interface JobLinkPreview {
+  jobUrl: string
+  jobTitle: string | null
+  companyName: string | null
+  /** The user's existing company with the same name, if any. */
+  matchedCompanyId: number | null
+  location: string | null
+  employmentType: EmploymentType | null
+  salaryMin: number | null
+  salaryMax: number | null
+  salaryCurrency: string | null
+  notes: string | null
+  source: 'PAGE_DATA' | 'AI' | 'PAGE_DATA_AND_AI'
+}
+
+export const EMAIL_CATEGORIES = [
+  'APPLICATION_RECEIVED',
+  'INTERVIEW',
+  'ASSESSMENT',
+  'OFFER',
+  'REJECTED',
+  'OTHER',
+  'NOT_JOB_RELATED',
+] as const
+export type EmailCategory = (typeof EMAIL_CATEGORIES)[number]
+
+export interface SyncSummary {
+  startedAt: string
+  finishedAt: string
+  messagesScanned: number
+  emailsAnalyzed: number
+  statusesUpdated: number
+  error: string | null
+}
+
+export interface GmailStatus {
+  /** False when the server has no Google OAuth credentials. */
+  configured: boolean
+  connected: boolean
+  gmailAddress: string | null
+  lastSyncedAt: string | null
+  lastSyncError: string | null
+  syncing: boolean
+  lastRun: SyncSummary | null
+}
+
+export interface EmailEvent {
+  id: number
+  applicationId: number | null
+  jobTitle: string | null
+  companyName: string | null
+  sender: string | null
+  subject: string | null
+  receivedAt: string
+  category: EmailCategory
+  confidence: number | null
+  summary: string | null
+  statusBefore: ApplicationStatus | null
+  /** The status the email moved the application to; null if it didn't change it. */
+  statusAfter: ApplicationStatus | null
+}
+
 export interface ApiErrorBody {
   timestamp: string
   status: number

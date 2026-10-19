@@ -47,6 +47,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                        // Google redirects the browser here; the signed OAuth state identifies the user.
+                        .requestMatchers(HttpMethod.GET, "/api/gmail/oauth/callback").permitAll()
                         .requestMatchers(PUBLIC_DOCS).permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())

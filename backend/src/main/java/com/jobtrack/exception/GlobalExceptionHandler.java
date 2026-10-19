@@ -41,6 +41,17 @@ public class GlobalExceptionHandler {
         return respond(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(AiUnavailableException.class)
+    ResponseEntity<ApiError> handleAiUnavailable(AiUnavailableException ex, HttpServletRequest request) {
+        log.warn("AI model unavailable on {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return respond(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(GmailAuthException.class)
+    ResponseEntity<ApiError> handleGmailAuth(GmailAuthException ex, HttpServletRequest request) {
+        return respond(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(BadRequestException.class)
     ResponseEntity<ApiError> handleBadRequest(BadRequestException ex, HttpServletRequest request) {
         List<ApiError.FieldError> fieldErrors = ex.getField() == null

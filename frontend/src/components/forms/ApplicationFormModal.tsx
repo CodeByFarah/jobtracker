@@ -8,6 +8,7 @@ import {
   type Application,
   type ApplicationStatus,
   type EmploymentType,
+  type JobLinkPreview,
 } from '../../types/api'
 import { EMPLOYMENT_LABELS, STATUS_LABELS, todayIso } from '../../utils/format'
 import { nullIfBlank, numberOrNull } from '../../utils/form'
@@ -21,28 +22,34 @@ interface ApplicationFormModalProps {
   application?: Application
   /** Pre-selects the company when creating from a company page. */
   defaultCompanyId?: number
+  /** Values read from a job posting link ("Add from link"); only used when creating. */
+  prefill?: JobLinkPreview
   onClose: () => void
   onSaved: (application: Application) => void
 }
 
-export function ApplicationFormModal({ application, defaultCompanyId, onClose, onSaved }: ApplicationFormModalProps) {
+export function ApplicationFormModal({ application, defaultCompanyId, prefill, onClose, onSaved }: ApplicationFormModalProps) {
   const isEdit = application !== undefined
   const companies = useAsync(() => companyApi.list(), [])
+  // A company name from the link that isn't one of the user's companies yet becomes a new company.
+  const prefillNewCompany = prefill?.companyName && prefill.matchedCompanyId === null ? prefill.companyName : ''
 
   const [companyChoice, setCompanyChoice] = useState<string>(
-    String(application?.company.id ?? defaultCompanyId ?? ''),
+    prefillNewCompany ? NEW_COMPANY : String(application?.company.id ?? prefill?.matchedCompanyId ?? defaultCompanyId ?? ''),
   )
-  const [newCompanyName, setNewCompanyName] = useState('')
-  const [jobTitle, setJobTitle] = useState(application?.jobTitle ?? '')
-  const [jobUrl, setJobUrl] = useState(application?.jobUrl ?? '')
-  const [location, setLocation] = useState(application?.location ?? '')
-  const [employmentType, setEmploymentType] = useState<EmploymentType | ''>(application?.employmentType ?? '')
-  const [salaryMin, setSalaryMin] = useState(application?.salaryMin?.toString() ?? '')
-  const [salaryMax, setSalaryMax] = useState(application?.salaryMax?.toString() ?? '')
-  const [salaryCurrency, setSalaryCurrency] = useState(application?.salaryCurrency ?? '')
+  const [newCompanyName, setNewCompanyName] = useState(prefillNewCompany)
+  const [jobTitle, setJobTitle] = useState(application?.jobTitle ?? prefill?.jobTitle ?? '')
+  const [jobUrl, setJobUrl] = useState(application?.jobUrl ?? prefill?.jobUrl ?? '')
+  const [location, setLocation] = useState(application?.location ?? prefill?.location ?? '')
+  const [employmentType, setEmploymentType] = useState<EmploymentType | ''>(
+    application?.employmentType ?? prefill?.employmentType ?? '',
+  )
+  const [salaryMin, setSalaryMin] = useState((application?.salaryMin ?? prefill?.salaryMin)?.toString() ?? '')
+  const [salaryMax, setSalaryMax] = useState((application?.salaryMax ?? prefill?.salaryMax)?.toString() ?? '')
+  const [salaryCurrency, setSalaryCurrency] = useState(application?.salaryCurrency ?? prefill?.salaryCurrency ?? '')
   const [status, setStatus] = useState<ApplicationStatus>('APPLIED')
   const [applicationDate, setApplicationDate] = useState(application?.applicationDate ?? (isEdit ? '' : todayIso()))
-  const [notes, setNotes] = useState(application?.notes ?? '')
+  const [notes, setNotes] = useState(application?.notes ?? prefill?.notes ?? '')
   const { submitting, formError, fieldErrors, setFieldErrors, run } = useSubmit()
   const createdCompany = useRef<{ id: number; name: string } | null>(null)
 
@@ -94,7 +101,7 @@ export function ApplicationFormModal({ application, defaultCompanyId, onClose, o
 
   return (
     <Modal
-      title={isEdit ? 'Edit application' : 'New application'}
+      title={isEdit ? 'Edit application' : prefill ? 'Check the imported job' : 'New application'}
       onClose={onClose}
       footer={
         <>
@@ -109,6 +116,14 @@ export function ApplicationFormModal({ application, defaultCompanyId, onClose, o
     >
       <form id="application-form" className="form" onSubmit={submit} noValidate>
         {formError && <p className="form-error" role="alert">{formError}</p>}
+        {prefill && !isEdit && (
+          <p className="notice" role="status">
+            {prefill.source === 'PAGE_DATA'
+              ? 'Filled in from the job posting.'
+              : 'Filled in by your local AI from the job posting. It can make mistakes.'}{' '}
+            Check the details, then add the application.
+          </p>
+        )}
 
         <FormField label="Job title" required error={fieldErrors.jobTitle}>
           <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} required maxLength={150} placeholder="e.g. Backend Engineer" />

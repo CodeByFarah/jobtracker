@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Application } from '../types/api'
 import { EMPLOYMENT_LABELS, formatDate, formatSalary } from '../utils/format'
-import { StatusBadge } from './StatusBadge'
+import { NoReplyBadge, StatusBadge } from './StatusBadge'
 
 /**
  * One application in a list. Laid out as a table-like row on wide screens and as a
@@ -26,6 +26,7 @@ export function ApplicationCard({ application, showCompany = true }: { applicati
       </span>
       <span className="app-row-status">
         <StatusBadge status={application.status} />
+        <NoReplyBadge application={application} />
       </span>
     </Link>
   )

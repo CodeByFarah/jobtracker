@@ -7,7 +7,8 @@ import { TaskFormModal } from '../components/forms/TaskFormModal'
 import { Icon } from '../components/Icon'
 import { InterviewCard } from '../components/InterviewCard'
 import { ErrorState, LoadingState } from '../components/States'
-import { StatusBadge } from '../components/StatusBadge'
+import { EmailEventList } from '../components/EmailEventList'
+import { NoReplyBadge, StatusBadge } from '../components/StatusBadge'
 import { StatusTimeline } from '../components/StatusTimeline'
 import { TaskItem } from '../components/TaskItem'
 import { useAsync } from '../hooks/useAsync'
@@ -35,6 +36,7 @@ export function ApplicationDetailPage() {
   const history = useAsync(() => applicationApi.history(id), [id])
   const interviews = useAsync(() => applicationApi.interviews(id), [id])
   const tasks = useAsync(() => applicationApi.tasks(id), [id])
+  const emails = useAsync(() => applicationApi.emails(id), [id])
   const [dialog, setDialog] = useState<Dialog>(null)
   const [statusError, setStatusError] = useState<string | null>(null)
   const [changingStatus, setChangingStatus] = useState(false)
@@ -83,6 +85,7 @@ export function ApplicationDetailPage() {
           <div className="detail-title">
             <h1>{app.jobTitle}</h1>
             <StatusBadge status={app.status} />
+            <NoReplyBadge application={app} />
           </div>
           <p className="detail-subtitle">
             <Link to={`/companies/${app.company.id}`}>{app.company.name}</Link>
@@ -171,6 +174,23 @@ export function ApplicationDetailPage() {
             </dl>
             <h3 className="notes-heading">Notes</h3>
             {app.notes ? <p className="notes">{app.notes}</p> : <p className="muted">No notes yet.</p>}
+          </section>
+
+          <section className="card">
+            <header className="section-header">
+              <h2>Emails</h2>
+              <Link to="/profile" className="muted email-settings-link">
+                Gmail settings
+              </Link>
+            </header>
+            {emails.error && <ErrorState error={emails.error} onRetry={emails.reload} />}
+            {emails.data?.length === 0 && (
+              <p className="muted empty-inline">
+                No emails matched yet. Connect Gmail on your profile and the AI will attach replies from{' '}
+                {app.company.name} here.
+              </p>
+            )}
+            {emails.data && emails.data.length > 0 && <EmailEventList events={emails.data} />}
           </section>
 
           <section className="card">

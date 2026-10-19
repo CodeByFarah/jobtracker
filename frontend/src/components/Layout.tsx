@@ -1,76 +1,82 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { Icon, type IconName } from './Icon'
+import { Icon } from './Icon'
 
-const NAV_ITEMS: { to: string; label: string; icon: IconName }[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { to: '/applications', label: 'Applications', icon: 'briefcase' },
-  { to: '/companies', label: 'Companies', icon: 'building' },
-  { to: '/interviews', label: 'Interviews', icon: 'calendar' },
-  { to: '/tasks', label: 'Tasks', icon: 'tasks' },
+const NAV_ITEMS: { to: string; label: string }[] = [
+  { to: '/dashboard', label: 'Overview' },
+  { to: '/applications', label: 'Applications' },
+  { to: '/companies', label: 'Companies' },
+  { to: '/interviews', label: 'Interviews' },
+  { to: '/tasks', label: 'Tasks' },
 ]
 
+/** App shell: a slim translucent bar across the top (apple.com style) and a centred page. */
 export function Layout() {
   const { user, logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
-  // Close the mobile menu after navigating.
-  const closeMenu = () => setMenuOpen(false)
+
+  const navClass = ({ isActive }: { isActive: boolean }) => `nav-link ${isActive ? 'active' : ''}`
+  const initial = user?.fullName.trim().charAt(0).toUpperCase() ?? '?'
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <button
-          type="button"
-          className="icon-button"
-          onClick={() => setMenuOpen((open) => !open)}
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={menuOpen}
-          aria-controls="sidebar"
-        >
-          <Icon name={menuOpen ? 'close' : 'menu'} />
-        </button>
-        <span className="brand">
-          <img src="/favicon.svg" alt="" width={24} height={24} /> JobTrack
-        </span>
-      </header>
+      <header className={`globalnav ${menuOpen ? 'globalnav-open' : ''}`}>
+        <div className="globalnav-inner">
+          <NavLink to="/dashboard" className="brand" aria-label="JobTrack home">
+            <img src="/favicon.svg" alt="" width={20} height={20} />
+            <span>JobTrack</span>
+          </NavLink>
 
-      <aside id="sidebar" className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
-        <div className="brand sidebar-brand">
-          <img src="/favicon.svg" alt="" width={26} height={26} /> JobTrack
-        </div>
-        <nav aria-label="Main">
-          <ul className="nav-list">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  onClick={closeMenu}
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <Icon name={item.icon} />
-                  {item.label}
+          {/* Any click on a link inside closes the mobile menu. */}
+          <nav aria-label="Main" id="main-nav" className="globalnav-links" onClick={() => setMenuOpen(false)}>
+            <ul className="nav-list">
+              {NAV_ITEMS.map((item) => (
+                <li key={item.to}>
+                  <NavLink to={item.to} className={navClass}>
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+              <li className="nav-mobile-only">
+                <NavLink to="/profile" className={navClass}>
+                  Profile
                 </NavLink>
               </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="sidebar-footer">
-          <NavLink
-            to="/profile"
-            onClick={closeMenu}
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-          >
-            <Icon name="user" />
-            <span className="truncate">{user?.fullName ?? 'Profile'}</span>
-          </NavLink>
-          <button type="button" className="nav-link" onClick={logout}>
-            <Icon name="logout" />
-            Log out
-          </button>
+              <li className="nav-mobile-only">
+                <button type="button" className="nav-link" onClick={logout}>
+                  Log out
+                </button>
+              </li>
+            </ul>
+          </nav>
+
+          <div className="globalnav-actions">
+            <NavLink
+              to="/profile"
+              className="avatar-link"
+              title={user?.fullName ?? 'Profile'}
+              aria-label="Profile"
+              onClick={() => setMenuOpen(false)}
+            >
+              {initial}
+            </NavLink>
+            <button type="button" className="nav-link nav-desktop-only" onClick={logout}>
+              Log out
+            </button>
+            <button
+              type="button"
+              className="icon-button menu-toggle"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              aria-controls="main-nav"
+            >
+              <Icon name={menuOpen ? 'close' : 'menu'} />
+            </button>
+          </div>
         </div>
-      </aside>
-      {menuOpen && <div className="sidebar-scrim" onClick={closeMenu} aria-hidden="true" />}
+      </header>
 
       <main className="main">
         <Outlet />

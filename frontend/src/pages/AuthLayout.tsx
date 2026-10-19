@@ -1,15 +1,13 @@
 import type { ReactNode } from 'react'
 
-/** Centered card used by the login and registration pages. */
+/** Login and registration: a large centred headline and a single form, nothing else. */
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   return (
     <div className="auth-page">
-      <div className="auth-card card">
-        <div className="brand auth-brand">
-          <img src="/favicon.svg" alt="" width={32} height={32} /> JobTrack
-        </div>
+      <div className="auth-card">
+        <img className="auth-logo" src="/favicon.svg" alt="JobTrack" width={44} height={44} />
         <h1>{title}</h1>
-        <p className="muted">{subtitle}</p>
+        <p className="auth-subtitle">{subtitle}</p>
         {children}
       </div>
     </div>

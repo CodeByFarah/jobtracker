@@ -10,14 +10,11 @@ import com.jobtrack.dto.application.UpdateApplicationRequest;
 import com.jobtrack.dto.common.PageResponse;
 import com.jobtrack.dto.interview.InterviewRequest;
 import com.jobtrack.dto.interview.InterviewResponse;
-import com.jobtrack.dto.task.CreateTaskRequest;
-import com.jobtrack.dto.task.TaskResponse;
 import com.jobtrack.entity.ApplicationStatus;
 import com.jobtrack.entity.EmploymentType;
 import com.jobtrack.security.CurrentUser;
 import com.jobtrack.service.ApplicationService;
 import com.jobtrack.service.InterviewService;
-import com.jobtrack.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -45,20 +42,18 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/applications")
-@Tag(name = "Applications", description = "Job applications, their status history, interviews and tasks")
+@Tag(name = "Applications", description = "Job applications, their status history and interviews")
 @ApiResponse(responseCode = "401", description = "Missing or invalid token")
 public class ApplicationController {
 
     private final ApplicationService applicationService;
     private final InterviewService interviewService;
-    private final TaskService taskService;
     private final CurrentUser currentUser;
 
     public ApplicationController(ApplicationService applicationService, InterviewService interviewService,
-                                 TaskService taskService, CurrentUser currentUser) {
+                                 CurrentUser currentUser) {
         this.applicationService = applicationService;
         this.interviewService = interviewService;
-        this.taskService = taskService;
         this.currentUser = currentUser;
     }
 
@@ -122,7 +117,7 @@ public class ApplicationController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete an application", description = "Also deletes its history, interviews and tasks.")
+    @Operation(summary = "Delete an application", description = "Also deletes its history, interviews and emails.")
     @ApiResponse(responseCode = "204", description = "Deleted")
     @ApiResponse(responseCode = "404", description = "Not found or not owned by the caller")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
@@ -154,23 +149,6 @@ public class ApplicationController {
                                                              @Valid @RequestBody InterviewRequest request) {
         InterviewResponse created = interviewService.create(currentUser.id(), id, request);
         return ResponseEntity.created(resourceUri("/api/interviews/{id}", created.id())).body(created);
-    }
-
-    @GetMapping("/{id}/tasks")
-    @Operation(summary = "List an application's follow-up tasks", description = "Open tasks first, by due date.")
-    @ApiResponse(responseCode = "404", description = "Not found or not owned by the caller")
-    public List<TaskResponse> tasks(@PathVariable Long id) {
-        return taskService.listForApplication(currentUser.id(), id);
-    }
-
-    @PostMapping("/{id}/tasks")
-    @Operation(summary = "Add a follow-up task to an application")
-    @ApiResponse(responseCode = "201", description = "Created")
-    @ApiResponse(responseCode = "400", description = "Validation failed")
-    @ApiResponse(responseCode = "404", description = "Application not found or not owned by the caller")
-    public ResponseEntity<TaskResponse> createTask(@PathVariable Long id, @Valid @RequestBody CreateTaskRequest request) {
-        TaskResponse created = taskService.create(currentUser.id(), id, request);
-        return ResponseEntity.created(resourceUri("/api/tasks/{id}", created.id())).body(created);
     }
 
     private static URI locationOf(Long id) {

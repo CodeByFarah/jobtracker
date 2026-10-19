@@ -1,8 +1,8 @@
 # JobTrack
 
 JobTrack is a job application tracker. It keeps a job search in one place: the companies you're
-talking to, every application and how it progressed, interviews, follow-up tasks, and a dashboard
-that shows where things stand.
+talking to, every application and how it progressed, interviews, and a dashboard that shows where
+things stand. Connect Gmail and a local AI model reads your job emails and keeps every status up to date.
 
 It is a full-stack project: a Spring Boot REST API backed by PostgreSQL, and a React + TypeScript
 frontend. Every number and list in the UI comes from the database; nothing is mocked.
@@ -17,8 +17,9 @@ frontend. Every number and list in the UI comes from the database; nothing is mo
 - **Status workflow.** Statuses run `SAVED → APPLIED → SCREENING → INTERVIEW → OFFER → ACCEPTED`, and `REJECTED` / `WITHDRAWN` can be reached from any open stage. Only valid transitions are allowed.
 - **Status history.** Every status change is recorded with the previous status, the new status and a timestamp, and shown as a timeline.
 - **Interviews.** Schedule, edit and delete interviews by type (recruiter, technical, system design, …) and status. Dates are validated: a scheduled interview must be in the future, and a completed one must be in the past.
-- **Follow-up tasks.** Tasks have a due date and can be completed or reopened; completion time is recorded. You can filter open and completed tasks, and overdue tasks are highlighted.
-- **Dashboard.** Shows totals, applications this month, active applications, interviews, offers, rejections, open and overdue tasks, a status breakdown chart, applications per month, and upcoming interviews and tasks.
+- **Gmail tracking.** Until Gmail is connected, the Dashboard and Applications pages ask you to connect it. Once connected, the AI reads job-related emails and records replies, interview invites, rejections and offers against the matching application.
+- **Check for Updates.** One button scans your inbox, works out the status of every application, writes a short AI summary, and updates all records immediately. The dialog shows live progress, then the summary, each status change with the email that caused it, and the current status of every application.
+- **Dashboard.** Shows totals, applications this month, active applications, interviews, offers, rejections, a status breakdown chart, applications per month, the latest inbox summary, and upcoming interviews.
 - **Search, filters, sorting and pagination.** These all run in the database: search by job title or company; filter by status, location and employment type; sort by application date, last update or title.
 - **API documentation.** OpenAPI 3 with Swagger UI.
 
@@ -64,7 +65,7 @@ Frontend (`frontend/src`): `pages/` (routes), `components/` (reusable UI such as
 |---|---|
 | **Java 21 + Spring Boot 4** | Mature, well-understood stack for REST APIs; records keep DTOs concise. |
 | **Spring Data JPA / Hibernate** | Repositories and Specifications remove boilerplate while leaving room for hand-written aggregate queries. |
-| **PostgreSQL** | The data is relational (users → companies → applications → history/interviews/tasks); foreign keys and check constraints enforce integrity in the database itself. |
+| **PostgreSQL** | The data is relational (users → companies → applications → history/interviews/emails); foreign keys and check constraints enforce integrity in the database itself. |
 | **Flyway** | Versioned SQL migrations; Hibernate only validates the schema (`ddl-auto=validate`). |
 | **Spring Security + OAuth2 Resource Server** | Standard, well-tested JWT validation (signature, expiry, issuer) without a hand-written auth filter. |
 | **Bean Validation** | Declarative input validation on DTOs, reported as field-level errors. |
@@ -79,7 +80,7 @@ users ─┬─< companies ──┐
        └─< applications >┘ (company_id, ON DELETE RESTRICT)
               ├─< application_status_history
               ├─< interviews
-              └─< tasks
+              └─< email_events >── gmail_connections (one per user)
 ```
 
 | Table | Key points |
@@ -89,16 +90,17 @@ users ─┬─< companies ──┐
 | `applications` | Owned by a user and linked to one of their companies. Check constraints on status, employment type and salary range (`salary_min <= salary_max`). |
 | `application_status_history` | `previous_status` (null for the initial entry), `new_status`, `changed_at`. |
 | `interviews` | Type, scheduled time, duration, interviewer, location/link, notes, status. |
-| `tasks` | Title, description, due date, `completed` + `completed_at` (a check constraint keeps them consistent). |
+| `gmail_connections` | One per user: Gmail address, AES-GCM encrypted refresh token, last check time and error. |
+| `email_events` | Every email the AI read: category, confidence, one-line summary, and the status change it caused. Unique per Gmail message, so nothing is read twice. |
 
 All tables have `created_at` / `updated_at` (history entries are immutable and only have `changed_at`).
 Indexes follow the queries: every list is scoped to a user, so composite indexes lead with `user_id`
 (`(user_id, status)`, `(user_id, application_date)`, `(user_id, updated_at)`), plus foreign-key
-indexes on `company_id`, `application_id` and `tasks.due_date`. The schema is in
-[`V1__init_schema.sql`](backend/src/main/resources/db/migration/V1__init_schema.sql).
+indexes on `company_id` and `application_id`. The schema is built by the Flyway migrations in
+[`db/migration`](backend/src/main/resources/db/migration) (V3 removed the old follow-up tasks table).
 
 **Deletion strategy**
-- Deleting an **application** cascades to its history, interviews and tasks, which have no meaning on their own.
+- Deleting an **application** cascades to its history, interviews and matched emails, which have no meaning on their own.
 - Deleting a **company** that still has applications is **refused with `409 Conflict`**. Cascading would silently destroy application history, and nulling the reference would leave applications without an employer. The service checks first to give a clear message, and the foreign key (`ON DELETE RESTRICT`) enforces the same rule in the database.
 
 ## Authentication
@@ -126,10 +128,9 @@ indexes on `company_id`, `application_id` and `tasks.due_date`. The schema is in
   - A `COMPLETED` interview can't be in the future.
   - New interviews can't be scheduled for a closed application.
   - An interview whose time has passed can still have its notes edited.
-- **Task completion** stores `completed_at`. Reopening a task clears it, and re-completing a task keeps the original timestamp.
 - **Dashboard statistics** are `COUNT` / `GROUP BY` queries, not in-memory processing.
   - "Offers" counts applications that ever reached `OFFER` according to the history, so an accepted offer still counts.
-  - "This month" and "overdue" use the caller's time zone (the `timezone` parameter).
+  - "This month" uses the caller's time zone (the `timezone` parameter).
 
 More detail and the reasoning behind these choices: [docs/engineering-decisions.md](docs/engineering-decisions.md).
 
@@ -143,9 +144,10 @@ never go to a third-party AI service.
   employment type, salary and a short summary. Most job boards embed a schema.org `JobPosting`
   object, which is read directly (instant and exact); the AI only reads the page text when that is
   missing. Nothing is saved until you check the values and click *Add application*.
-- **Gmail tracking.** Connect Gmail (read-only) on the Profile page. Every 30 minutes, and on
-  *Check now*, new emails are fetched; those that mention the company of one of your open
-  applications are read by the AI, which decides what each one means:
+- **Gmail tracking.** Connect Gmail (read-only) from the prompt on the Dashboard or Applications
+  page, or on the Profile page. Every 30 minutes, and whenever you click *Check for updates*, new
+  emails are fetched; those that mention the company of one of your open applications are read by
+  the AI, which decides what each one means:
 
   | Email | Application moves to |
   |---|---|
@@ -222,10 +224,10 @@ No local database or configuration is needed.
 
 | Kind | What is covered |
 |---|---|
-| Unit tests (JUnit 5 + Mockito) | Status transitions and history, application creation and update, validation rules, ownership (not-found for foreign ids), company creation, duplicate names and deletion rules, interview date rules, task completion, dashboard calculations (zero-filling, time zones), registration and login. |
+| Unit tests (JUnit 5 + Mockito) | Status transitions and history, application creation and update, validation rules, ownership (not-found for foreign ids), company creation, duplicate names and deletion rules, interview date rules, email status rules and the update summary, dashboard calculations (zero-filling, time zones), registration and login. |
 | Integration tests (`@SpringBootTest` + MockMvc + Testcontainers) | The full acceptance workflow (register → … → dashboard → search). User A vs. user B on every resource type. Page size, page number and filters combined with pagination. Sorting. Validation and error bodies. Transaction rollback when the history insert fails. |
 
-125 tests; all pass (plus the opt-in live AI test described under *AI features*).
+122 tests; all pass (plus the opt-in live AI test described under *AI features*).
 
 ## Setup
 
@@ -311,19 +313,16 @@ Endpoint overview. Everything except register and login requires a bearer token.
 | PATCH | `/api/applications/{id}/status` | Change status (409 on an invalid transition) |
 | GET | `/api/applications/{id}/history` | Status history, oldest first |
 | GET / POST | `/api/applications/{id}/interviews` | List / schedule interviews |
-| GET / POST | `/api/applications/{id}/tasks` | List / create tasks |
 | GET | `/api/interviews` | All interviews (`scope=ALL\|UPCOMING\|PAST`) |
 | PUT / DELETE | `/api/interviews/{id}` | Update / delete an interview |
-| GET | `/api/tasks` | All tasks (`completed=true\|false`) |
-| PUT / DELETE | `/api/tasks/{id}` | Update / delete a task |
-| PATCH | `/api/tasks/{id}/completion` | Mark done / reopen |
 | GET | `/api/dashboard` | Statistics (`timezone=Europe/London`) |
 | POST | `/api/applications/import-link` | Read job details from a posting URL (nothing is saved) |
 | GET | `/api/applications/{id}/emails` | Emails the AI matched to an application |
-| GET / DELETE | `/api/gmail` | Gmail connection and sync status / disconnect |
+| GET / DELETE | `/api/gmail` | Gmail connection, sync status and progress / disconnect |
 | GET | `/api/gmail/connect-url` | Google sign-in URL |
 | GET | `/api/gmail/oauth/callback` | Called by Google after sign-in (public; uses the signed `state`) |
-| POST | `/api/gmail/sync` | Check Gmail now (runs in the background, 202) |
+| POST | `/api/gmail/sync` | Check for updates (runs in the background, 202) |
+| GET | `/api/gmail/report` | Result of the last check: AI summary, status changes, and every application's current status |
 | GET | `/api/gmail/events` | Recent emails matched to applications |
 
 Errors always have the same shape:

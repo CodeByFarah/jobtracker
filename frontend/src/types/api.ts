@@ -125,26 +125,6 @@ export interface InterviewInput {
   status?: InterviewStatus
 }
 
-export interface Task {
-  id: number
-  applicationId: number
-  jobTitle: string
-  companyName: string
-  title: string
-  description: string | null
-  dueDate: string | null
-  completed: boolean
-  completedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface TaskInput {
-  title: string
-  description?: string | null
-  dueDate?: string | null
-}
-
 export interface Page<T> {
   content: T[]
   page: number
@@ -161,12 +141,9 @@ export interface Dashboard {
   upcomingInterviewCount: number
   offers: number
   rejected: number
-  outstandingTasks: number
-  overdueTasks: number
   statusBreakdown: { status: ApplicationStatus; count: number }[]
   applicationsPerMonth: { month: string; count: number }[]
   upcomingInterviews: Interview[]
-  upcomingTasks: Task[]
 }
 
 /** Job details read from a posting link; nothing is saved until the user submits the form. */
@@ -196,6 +173,15 @@ export const EMAIL_CATEGORIES = [
 ] as const
 export type EmailCategory = (typeof EMAIL_CATEGORIES)[number]
 
+export interface StatusChange {
+  applicationId: number
+  jobTitle: string
+  companyName: string
+  from: ApplicationStatus
+  to: ApplicationStatus
+  emailSummary: string | null
+}
+
 export interface SyncSummary {
   startedAt: string
   finishedAt: string
@@ -203,6 +189,9 @@ export interface SyncSummary {
   emailsAnalyzed: number
   statusesUpdated: number
   error: string | null
+  changes: StatusChange[]
+  /** Short summary written by the local AI. */
+  overview: string | null
 }
 
 export interface GmailStatus {
@@ -213,7 +202,30 @@ export interface GmailStatus {
   lastSyncedAt: string | null
   lastSyncError: string | null
   syncing: boolean
+  /** While checking: emails processed so far / emails to look at (0 while listing). */
+  progressDone: number
+  progressTotal: number
   lastRun: SyncSummary | null
+}
+
+/** Where one application stands, with the latest email the AI matched to it. */
+export interface ApplicationUpdate {
+  id: number
+  jobTitle: string
+  companyName: string
+  status: ApplicationStatus
+  applicationDate: string | null
+  updatedAt: string
+  lastEmailAt: string | null
+  lastEmailCategory: EmailCategory | null
+  lastEmailSummary: string | null
+  changedInLastCheck: boolean
+  noReply: boolean
+}
+
+export interface UpdateReport {
+  lastCheck: SyncSummary | null
+  applications: ApplicationUpdate[]
 }
 
 export interface EmailEvent {

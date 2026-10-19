@@ -25,7 +25,7 @@ public class OpenApiConfig {
                         .version("1.0")
                         .description("""
                                 REST API for managing a job search: companies, applications, status \
-                                history, interviews, follow-up tasks and dashboard statistics.
+                                history, interviews, AI email tracking (Gmail) and dashboard statistics.
 
                                 Authenticate with `POST /api/auth/login` (or register), then click \
                                 **Authorize** and paste the returned `accessToken`.

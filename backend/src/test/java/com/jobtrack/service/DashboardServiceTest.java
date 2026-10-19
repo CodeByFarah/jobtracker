@@ -3,7 +3,6 @@ package com.jobtrack.service;
 import com.jobtrack.dto.dashboard.DashboardResponse;
 import com.jobtrack.entity.ApplicationStatus;
 import com.jobtrack.repository.ApplicationStatusHistoryRepository;
-import com.jobtrack.repository.FollowUpTaskRepository;
 import com.jobtrack.repository.InterviewRepository;
 import com.jobtrack.repository.JobApplicationRepository;
 import com.jobtrack.repository.StatusCount;
@@ -25,7 +24,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -45,14 +43,12 @@ class DashboardServiceTest {
     ApplicationStatusHistoryRepository historyRepository;
     @Mock
     InterviewRepository interviewRepository;
-    @Mock
-    FollowUpTaskRepository taskRepository;
 
     DashboardService service;
 
     @BeforeEach
     void setUp() {
-        service = new DashboardService(applicationRepository, historyRepository, interviewRepository, taskRepository,
+        service = new DashboardService(applicationRepository, historyRepository, interviewRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         when(applicationRepository.countByStatusForUser(USER_ID)).thenReturn(List.of(
                 new StatusCount(ApplicationStatus.APPLIED, 12),
@@ -64,7 +60,6 @@ class DashboardServiceTest {
                 new Object[]{"2026-05", 3L}, new Object[]{"2026-09", 7L}));
         when(interviewRepository.findByApplicationUserIdAndStatusInAndScheduledAtAfterOrderByScheduledAtAsc(
                 anyLong(), any(), any(), any())).thenReturn(List.of());
-        when(taskRepository.findForUserByCompleted(anyLong(), anyBoolean(), any())).thenReturn(List.of());
     }
 
     @Test
@@ -86,14 +81,12 @@ class DashboardServiceTest {
         when(applicationRepository.countByUserIdAndStatusIn(USER_ID, ApplicationStatus.ACTIVE)).thenReturn(20L);
         when(historyRepository.countApplicationsThatReachedStatus(USER_ID, ApplicationStatus.OFFER)).thenReturn(2L);
         when(interviewRepository.countByApplicationUserId(USER_ID)).thenReturn(9L);
-        when(taskRepository.countByApplicationUserIdAndCompletedFalse(USER_ID)).thenReturn(5L);
 
         DashboardResponse dashboard = service.getDashboard(USER_ID, ZoneOffset.UTC);
 
         assertThat(dashboard.activeApplications()).isEqualTo(20);
         assertThat(dashboard.offers()).isEqualTo(2);
         assertThat(dashboard.totalInterviews()).isEqualTo(9);
-        assertThat(dashboard.outstandingTasks()).isEqualTo(5);
     }
 
     @Test
@@ -110,14 +103,12 @@ class DashboardServiceTest {
     }
 
     @Test
-    void thisMonthAndOverdueUseTheCallersTimeZone() {
+    void thisMonthUsesTheCallersTimeZone() {
         service.getDashboard(USER_ID, ZoneId.of("Asia/Tokyo"));
 
         // In Tokyo it is already 1 October 2026
         verify(applicationRepository).countByUserIdAndApplicationDateBetween(
                 USER_ID, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
-        verify(taskRepository).countByApplicationUserIdAndCompletedFalseAndDueDateBefore(
-                USER_ID, LocalDate.of(2026, 10, 1));
     }
 
     private static List<Object[]> rows(Object[]... rows) {

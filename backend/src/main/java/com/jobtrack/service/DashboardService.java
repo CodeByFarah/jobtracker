@@ -6,9 +6,7 @@ import com.jobtrack.dto.dashboard.DashboardResponse.StatusCountResponse;
 import com.jobtrack.entity.ApplicationStatus;
 import com.jobtrack.entity.InterviewStatus;
 import com.jobtrack.mapper.InterviewMapper;
-import com.jobtrack.mapper.TaskMapper;
 import com.jobtrack.repository.ApplicationStatusHistoryRepository;
-import com.jobtrack.repository.FollowUpTaskRepository;
 import com.jobtrack.repository.InterviewRepository;
 import com.jobtrack.repository.JobApplicationRepository;
 import com.jobtrack.repository.StatusCount;
@@ -45,18 +43,15 @@ public class DashboardService {
     private final JobApplicationRepository applicationRepository;
     private final ApplicationStatusHistoryRepository historyRepository;
     private final InterviewRepository interviewRepository;
-    private final FollowUpTaskRepository taskRepository;
     private final Clock clock;
 
     public DashboardService(JobApplicationRepository applicationRepository,
                             ApplicationStatusHistoryRepository historyRepository,
                             InterviewRepository interviewRepository,
-                            FollowUpTaskRepository taskRepository,
                             Clock clock) {
         this.applicationRepository = applicationRepository;
         this.historyRepository = historyRepository;
         this.interviewRepository = interviewRepository;
-        this.taskRepository = taskRepository;
         this.clock = clock;
     }
 
@@ -82,15 +77,11 @@ public class DashboardService {
                         userId, PENDING_INTERVIEW, now),
                 historyRepository.countApplicationsThatReachedStatus(userId, ApplicationStatus.OFFER),
                 countFor(breakdown, ApplicationStatus.REJECTED),
-                taskRepository.countByApplicationUserIdAndCompletedFalse(userId),
-                taskRepository.countByApplicationUserIdAndCompletedFalseAndDueDateBefore(userId, today),
                 breakdown,
                 applicationsPerMonth(userId, thisMonth),
                 interviewRepository.findByApplicationUserIdAndStatusInAndScheduledAtAfterOrderByScheduledAtAsc(
                                 userId, PENDING_INTERVIEW, now, PageRequest.of(0, UPCOMING_LIMIT)).stream()
-                        .map(InterviewMapper::toResponse).toList(),
-                taskRepository.findForUserByCompleted(userId, false, PageRequest.of(0, UPCOMING_LIMIT)).stream()
-                        .map(TaskMapper::toResponse).toList());
+                        .map(InterviewMapper::toResponse).toList());
     }
 
     /** One entry per status in pipeline order, including statuses with no applications. */

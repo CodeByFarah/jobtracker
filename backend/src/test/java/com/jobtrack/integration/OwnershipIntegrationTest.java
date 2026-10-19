@@ -23,7 +23,6 @@ class OwnershipIntegrationTest extends IntegrationTestSupport {
     private long companyId;
     private long applicationId;
     private long interviewId;
-    private long taskId;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -34,8 +33,6 @@ class OwnershipIntegrationTest extends IntegrationTestSupport {
         interviewId = json(postJson("/api/applications/" + applicationId + "/interviews", ownerToken, Map.of(
                 "type", "RECRUITER",
                 "scheduledAt", Instant.now().plus(1, ChronoUnit.DAYS).toString()))
-                .andExpect(status().isCreated())).get("id").asLong();
-        taskId = json(postJson("/api/applications/" + applicationId + "/tasks", ownerToken, Map.of("title", "Follow up"))
                 .andExpect(status().isCreated())).get("id").asLong();
     }
 
@@ -75,7 +72,7 @@ class OwnershipIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void otherUserCannotAccessInterviewsOrTasks() throws Exception {
+    void otherUserCannotAccessInterviews() throws Exception {
         getJson("/api/applications/" + applicationId + "/interviews", otherToken).andExpect(status().isNotFound());
         postJson("/api/applications/" + applicationId + "/interviews", otherToken, Map.of(
                 "type", "OTHER", "scheduledAt", Instant.now().plus(2, ChronoUnit.DAYS).toString()))
@@ -85,13 +82,7 @@ class OwnershipIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isNotFound());
         deleteJson("/api/interviews/" + interviewId, otherToken).andExpect(status().isNotFound());
 
-        getJson("/api/applications/" + applicationId + "/tasks", otherToken).andExpect(status().isNotFound());
-        patchJson("/api/tasks/" + taskId + "/completion", otherToken, Map.of("completed", true))
-                .andExpect(status().isNotFound());
-        deleteJson("/api/tasks/" + taskId, otherToken).andExpect(status().isNotFound());
-
         getJson("/api/interviews", otherToken).andExpect(jsonPath("$", hasSize(0)));
-        getJson("/api/tasks", otherToken).andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test
@@ -99,8 +90,7 @@ class OwnershipIntegrationTest extends IntegrationTestSupport {
         getJson("/api/applications", otherToken).andExpect(jsonPath("$.totalElements").value(0));
         getJson("/api/dashboard", otherToken)
                 .andExpect(jsonPath("$.totalApplications").value(0))
-                .andExpect(jsonPath("$.totalInterviews").value(0))
-                .andExpect(jsonPath("$.outstandingTasks").value(0));
+                .andExpect(jsonPath("$.totalInterviews").value(0));
     }
 
     @Test

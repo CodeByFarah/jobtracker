@@ -3,18 +3,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ApplicationFormModal } from '../components/forms/ApplicationFormModal'
 import { InterviewFormModal } from '../components/forms/InterviewFormModal'
-import { TaskFormModal } from '../components/forms/TaskFormModal'
 import { Icon } from '../components/Icon'
 import { InterviewCard } from '../components/InterviewCard'
 import { ErrorState, LoadingState } from '../components/States'
 import { EmailEventList } from '../components/EmailEventList'
 import { NoReplyBadge, StatusBadge } from '../components/StatusBadge'
 import { StatusTimeline } from '../components/StatusTimeline'
-import { TaskItem } from '../components/TaskItem'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { applicationApi, interviewApi, taskApi } from '../services/api'
-import type { Application, ApplicationStatus, Interview, Task } from '../types/api'
+import { applicationApi, interviewApi } from '../services/api'
+import type { Application, ApplicationStatus, Interview } from '../types/api'
 import { EMPLOYMENT_LABELS, formatDate, formatInstantDate, formatSalary, STATUS_LABELS } from '../utils/format'
 
 const FINAL_STATUSES: ApplicationStatus[] = ['ACCEPTED', 'REJECTED', 'WITHDRAWN']
@@ -25,8 +23,6 @@ type Dialog =
   | { kind: 'status'; status: ApplicationStatus }
   | { kind: 'interview'; interview?: Interview }
   | { kind: 'deleteInterview'; interview: Interview }
-  | { kind: 'task'; task?: Task }
-  | { kind: 'deleteTask'; task: Task }
   | null
 
 export function ApplicationDetailPage() {
@@ -35,7 +31,6 @@ export function ApplicationDetailPage() {
   const application = useAsync(() => applicationApi.get(id), [id])
   const history = useAsync(() => applicationApi.history(id), [id])
   const interviews = useAsync(() => applicationApi.interviews(id), [id])
-  const tasks = useAsync(() => applicationApi.tasks(id), [id])
   const emails = useAsync(() => applicationApi.emails(id), [id])
   const [dialog, setDialog] = useState<Dialog>(null)
   const [statusError, setStatusError] = useState<string | null>(null)
@@ -74,7 +69,6 @@ export function ApplicationDetailPage() {
     else void changeStatus(status)
   }
 
-  const replaceTask = (task: Task) => tasks.setData((list) => list?.map((t) => (t.id === task.id ? task : t)))
   const salary = formatSalary(app.salaryMin, app.salaryMax, app.salaryCurrency)
 
   return (
@@ -217,28 +211,6 @@ export function ApplicationDetailPage() {
             </div>
           </section>
 
-          <section className="card">
-            <header className="section-header">
-              <h2>Follow-up tasks</h2>
-              <button type="button" className="button button-secondary button-small" onClick={() => setDialog({ kind: 'task' })}>
-                <Icon name="plus" size={16} /> Add task
-              </button>
-            </header>
-            {tasks.error && <ErrorState error={tasks.error} onRetry={tasks.reload} />}
-            {tasks.data?.length === 0 && <p className="muted empty-inline">No follow-ups planned.</p>}
-            <div className="stack">
-              {tasks.data?.map((task) => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  showApplication={false}
-                  onChanged={replaceTask}
-                  onEdit={() => setDialog({ kind: 'task', task })}
-                  onDelete={() => setDialog({ kind: 'deleteTask', task })}
-                />
-              ))}
-            </div>
-          </section>
         </div>
 
         <aside className="card detail-side">
@@ -271,7 +243,7 @@ export function ApplicationDetailPage() {
         return (
           <ConfirmDialog
             title="Delete application?"
-            message={`“${app.jobTitle}” at ${app.company.name} will be deleted together with its status history, interviews and tasks. This cannot be undone.`}
+            message={`“${app.jobTitle}” at ${app.company.name} will be deleted together with its status history, interviews and emails. This cannot be undone.`}
             onConfirm={async () => {
               await applicationApi.remove(app.id)
               navigate('/applications', { replace: true })
@@ -310,30 +282,6 @@ export function ApplicationDetailPage() {
             onConfirm={async () => {
               await interviewApi.remove(dialog.interview.id)
               interviews.reload()
-            }}
-            onClose={close}
-          />
-        )
-      case 'task':
-        return (
-          <TaskFormModal
-            applicationId={app.id}
-            task={dialog.task}
-            onClose={close}
-            onSaved={() => {
-              tasks.reload()
-              close()
-            }}
-          />
-        )
-      case 'deleteTask':
-        return (
-          <ConfirmDialog
-            title="Delete task?"
-            message={`“${dialog.task.title}” will be removed permanently.`}
-            onConfirm={async () => {
-              await taskApi.remove(dialog.task.id)
-              tasks.reload()
             }}
             onClose={close}
           />

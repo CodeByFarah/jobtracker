@@ -14,8 +14,7 @@ import type {
   JobLinkPreview,
   Page,
   StatusHistoryEntry,
-  Task,
-  TaskInput,
+  UpdateReport,
   User,
 } from '../types/api'
 import { buildQuery, http } from './http'
@@ -67,8 +66,6 @@ export const applicationApi = {
   interviews: (id: number) => http.get<Interview[]>(`/api/applications/${id}/interviews`),
   createInterview: (id: number, body: InterviewInput) =>
     http.post<Interview>(`/api/applications/${id}/interviews`, body),
-  tasks: (id: number) => http.get<Task[]>(`/api/applications/${id}/tasks`),
-  createTask: (id: number, body: TaskInput) => http.post<Task>(`/api/applications/${id}/tasks`, body),
   emails: (id: number) => http.get<EmailEvent[]>(`/api/applications/${id}/emails`),
   /** Reads job details from a posting link with the local AI. Can take up to a minute. */
   importLink: (url: string) => http.post<JobLinkPreview>('/api/applications/import-link', { url }),
@@ -80,20 +77,19 @@ export const gmailApi = {
   sync: () => http.post<GmailStatus>('/api/gmail/sync'),
   disconnect: () => http.delete('/api/gmail'),
   events: (limit = 20) => http.get<EmailEvent[]>(`/api/gmail/events${buildQuery({ limit })}`),
+  report: () => http.get<UpdateReport>('/api/gmail/report'),
+}
+
+/** Sends the browser to Google's consent page; Google sends it back to /profile?gmail=connected. */
+export async function connectGmail() {
+  const { url } = await gmailApi.connectUrl()
+  window.location.assign(url)
 }
 
 export const interviewApi = {
   list: (scope: 'ALL' | 'UPCOMING' | 'PAST') => http.get<Interview[]>(`/api/interviews${buildQuery({ scope })}`),
   update: (id: number, body: InterviewInput) => http.put<Interview>(`/api/interviews/${id}`, body),
   remove: (id: number) => http.delete(`/api/interviews/${id}`),
-}
-
-export const taskApi = {
-  list: (completed?: boolean) => http.get<Task[]>(`/api/tasks${buildQuery({ completed })}`),
-  update: (id: number, body: TaskInput & { completed: boolean }) => http.put<Task>(`/api/tasks/${id}`, body),
-  setCompleted: (id: number, completed: boolean) =>
-    http.patch<Task>(`/api/tasks/${id}/completion`, { completed }),
-  remove: (id: number) => http.delete(`/api/tasks/${id}`),
 }
 
 export const dashboardApi = {

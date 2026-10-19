@@ -11,7 +11,11 @@ public record GmailStatusResponse(
         String gmailAddress,
         Instant lastSyncedAt,
         String lastSyncError,
-        @Schema(description = "A sync is running or queued right now")
+        @Schema(description = "A check is running or queued right now")
         boolean syncing,
+        @Schema(description = "While checking: emails processed so far")
+        int progressDone,
+        @Schema(description = "While checking: new emails to look at (0 until they have been listed)")
+        int progressTotal,
         SyncSummary lastRun) {
 }

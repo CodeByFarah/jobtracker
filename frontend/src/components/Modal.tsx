@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from './Icon'
 
 interface ModalProps {
@@ -32,7 +33,9 @@ export function Modal({ title, onClose, children, footer, size = 'default' }: Mo
     }
   }, [onClose])
 
-  return (
+  // Rendered into <body>, so a dialog opened from inside an animated or transformed element
+  // (e.g. a page header) still covers the whole window and sits above everything else.
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={dialogRef}
@@ -51,6 +54,7 @@ export function Modal({ title, onClose, children, footer, size = 'default' }: Mo
         <div className="modal-body">{children}</div>
         {footer && <footer className="modal-footer">{footer}</footer>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

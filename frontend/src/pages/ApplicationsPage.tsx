@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ApplicationCard, ApplicationListHeader } from '../components/ApplicationCard'
+import { CheckUpdatesButton } from '../components/CheckUpdates'
 import { FilterPanel } from '../components/FilterPanel'
+import { GmailPrompt } from '../components/GmailPrompt'
 import { DEFAULT_FILTERS, type ApplicationFilters } from '../utils/filters'
 import { ApplicationFormModal } from '../components/forms/ApplicationFormModal'
 import { ImportLinkModal } from '../components/forms/ImportLinkModal'
@@ -94,6 +96,7 @@ export function ApplicationsPage() {
           </p>
         </div>
         <div className="header-actions">
+          <CheckUpdatesButton className="button button-secondary" onUpdated={results.reload} />
           <button type="button" className="button button-secondary" onClick={() => setImporting(true)}>
             <Icon name="link" /> Add from link
           </button>
@@ -102,6 +105,8 @@ export function ApplicationsPage() {
           </button>
         </div>
       </header>
+
+      <GmailPrompt />
 
       <div className="toolbar">
         <SearchBar value={search} onChange={onSearch} placeholder="Search job title or company" label="Search applications" />

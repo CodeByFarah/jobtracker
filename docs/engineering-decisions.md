@@ -5,7 +5,7 @@ Short notes on the main design choices in JobTrack and what each one trades off.
 ## Why PostgreSQL?
 
 The data is a strict hierarchy of relationships. A user owns companies and applications. Each
-application belongs to exactly one company and has its own status history, interviews and tasks.
+application belongs to exactly one company and has its own status history, interviews and matched emails.
 A relational database models this directly and **enforces** it:
 
 - Foreign keys make orphaned rows impossible. For example, an interview without an application can't exist.
@@ -13,7 +13,7 @@ A relational database models this directly and **enforces** it:
   - one company name per user;
   - valid status values;
   - `salary_min <= salary_max`;
-  - `completed` is true exactly when `completed_at` is set.
+  - each Gmail message is recorded at most once.
 - The dashboard is aggregate queries (`COUNT`, `GROUP BY status`, per-month grouping), which SQL handles in one round-trip.
 - Transactions give atomic multi-row updates (see below).
 
@@ -45,7 +45,7 @@ those layers would add indirection without adding flexibility.
 - **Validation sits on the request types**, so each operation carries its own rules.
 
 `CompanyRequest` and `InterviewRequest` are shared between create and update, because both
-operations accept exactly the same fields. Applications and tasks have separate create and update
+operations accept exactly the same fields. Applications have separate create and update
 types because their fields genuinely differ.
 
 ## Why keep a status history?

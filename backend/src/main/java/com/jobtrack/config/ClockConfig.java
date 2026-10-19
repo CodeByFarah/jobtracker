@@ -7,7 +7,7 @@ import java.time.Clock;
 
 /**
  * Services read "now" from an injected clock so that time-dependent rules (upcoming interviews,
- * "this month" statistics, overdue tasks) can be tested deterministically.
+ * "this month" statistics, "no reply" checks) can be tested deterministically.
  */
 @Configuration(proxyBeanMethods = false)
 public class ClockConfig {

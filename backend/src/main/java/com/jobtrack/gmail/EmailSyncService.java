@@ -1,6 +1,7 @@
 package com.jobtrack.gmail;
 
 import com.jobtrack.config.GmailProperties;
+import com.jobtrack.dto.gmail.StatusChange;
 import com.jobtrack.dto.gmail.SyncSummary;
 import com.jobtrack.entity.ApplicationStatus;
 import com.jobtrack.entity.EmailCategory;
@@ -65,6 +66,7 @@ public class EmailSyncService {
     private final GmailConnectionService connectionService;
     private final GmailApiClient gmail;
     private final EmailClassifier classifier;
+    private final UpdateSummaryWriter summaryWriter;
     private final GmailProperties properties;
     private final Clock clock;
 
@@ -75,11 +77,14 @@ public class EmailSyncService {
     });
     private final Set<Long> queuedOrRunning = ConcurrentHashMap.newKeySet();
     private final Map<Long, SyncSummary> lastRuns = new ConcurrentHashMap<>();
+    /** userId -> {emails processed, emails to process} while a check runs. */
+    private final Map<Long, int[]> progress = new ConcurrentHashMap<>();
 
     public EmailSyncService(GmailConnectionRepository connectionRepository, EmailEventRepository eventRepository,
                             JobApplicationRepository applicationRepository, UserRepository userRepository,
                             ApplicationService applicationService, GmailConnectionService connectionService,
-                            GmailApiClient gmail, EmailClassifier classifier, GmailProperties properties, Clock clock) {
+                            GmailApiClient gmail, EmailClassifier classifier, UpdateSummaryWriter summaryWriter,
+                            GmailProperties properties, Clock clock) {
         this.connectionRepository = connectionRepository;
         this.eventRepository = eventRepository;
         this.applicationRepository = applicationRepository;
@@ -88,6 +93,7 @@ public class EmailSyncService {
         this.connectionService = connectionService;
         this.gmail = gmail;
         this.classifier = classifier;
+        this.summaryWriter = summaryWriter;
         this.properties = properties;
         this.clock = clock;
     }
@@ -117,6 +123,12 @@ public class EmailSyncService {
         return Optional.ofNullable(lastRuns.get(userId));
     }
 
+    /** {done, total} for a running check; {0, 0} when idle or still listing emails. */
+    public int[] progress(Long userId) {
+        int[] current = progress.get(userId);
+        return current == null ? new int[]{0, 0} : current.clone();
+    }
+
     @PreDestroy
     void shutdown() {
         worker.shutdownNow();
@@ -132,8 +144,11 @@ public class EmailSyncService {
         Instant startedAt = clock.instant();
         int scanned = 0;
         int analyzed = 0;
-        int updated = 0;
+        List<StatusChange> changes = new ArrayList<>();
         String error = null;
+        String overview = null;
+        int[] counter = {0, 0};
+        progress.put(userId, counter);
         try {
             String accessToken = connectionService.accessToken(connection);
             List<String> ids = gmail.listMessageIds(accessToken, query(connection.getLastSyncedAt()),
@@ -146,39 +161,46 @@ public class EmailSyncService {
             }
             // Oldest first, so an application moves through its statuses in the order things happened.
             messages.sort(Comparator.comparing(GmailMessage::receivedAt));
+            counter[1] = messages.size();
 
             for (GmailMessage message : messages) {
                 scanned++;
                 // Re-read every time: an earlier email in this run may have changed or closed an application.
                 List<JobApplication> open = applicationRepository.findByUserIdAndStatusIn(userId, OPEN);
                 List<JobApplication> candidates = CompanyMatcher.candidates(message, open);
-                if (candidates.isEmpty()) {
-                    continue;
+                if (!candidates.isEmpty()) {
+                    analyzed++;
+                    EmailClassification classification = classifier.classify(message, candidates);
+                    StatusChange change = record(userId, message, classification, candidates);
+                    if (change != null) {
+                        changes.add(change);
+                    }
                 }
-                analyzed++;
-                EmailClassification classification = classifier.classify(message, candidates);
-                if (record(userId, message, classification, candidates)) {
-                    updated++;
-                }
+                counter[0] = scanned;
             }
+            overview = summaryWriter.write(applicationRepository.findByUserIdOrderByUpdatedAtDesc(userId),
+                    changes, analyzed, clock.instant());
         } catch (GmailAuthException | AiUnavailableException e) {
             error = e.getMessage();
         } catch (RestClientException e) {
             log.warn("Gmail sync for user {} failed: {}", userId, e.getMessage());
             error = "Couldn't reach Gmail: " + e.getMessage();
+        } finally {
+            progress.remove(userId);
         }
 
         // Only move the "read up to" mark forward after a complete run, so a failed run is retried.
         Instant finishedAt = clock.instant();
         updateConnection(userId, error == null ? startedAt : null, error);
-        lastRuns.put(userId, new SyncSummary(startedAt, finishedAt, scanned, analyzed, updated, error));
+        lastRuns.put(userId, new SyncSummary(startedAt, finishedAt, scanned, analyzed, changes.size(), error,
+                List.copyOf(changes), overview));
         log.info("Gmail sync for user {}: {} new emails, {} read by AI, {} applications updated{}",
-                userId, scanned, analyzed, updated, error == null ? "" : " (stopped: " + error + ")");
+                userId, scanned, analyzed, changes.size(), error == null ? "" : " (stopped: " + error + ")");
     }
 
-    /** Saves what the AI decided and applies the status change. Returns true if a status changed. */
-    private boolean record(Long userId, GmailMessage message, EmailClassification classification,
-                           List<JobApplication> candidates) {
+    /** Saves what the AI decided and applies the status change. Returns the change, or null if none. */
+    private StatusChange record(Long userId, GmailMessage message, EmailClassification classification,
+                                List<JobApplication> candidates) {
         JobApplication application = classification.applicationId() == null ? null : candidates.stream()
                 .filter(a -> a.getId().equals(classification.applicationId()))
                 .findFirst()
@@ -214,7 +236,11 @@ public class EmailSyncService {
         } catch (DataIntegrityViolationException e) {
             log.debug("Email {} was already recorded", message.id());
         }
-        return after != before;
+        if (application == null || after == before) {
+            return null;
+        }
+        return new StatusChange(application.getId(), application.getJobTitle(), application.getCompany().getName(),
+                before, after, classification.summary());
     }
 
     private void updateConnection(Long userId, Instant syncedAt, String error) {

@@ -8,7 +8,6 @@ const NAV_ITEMS: { to: string; label: string }[] = [
   { to: '/applications', label: 'Applications' },
   { to: '/companies', label: 'Companies' },
   { to: '/interviews', label: 'Interviews' },
-  { to: '/tasks', label: 'Tasks' },
 ]
 
 /** App shell: a slim translucent bar across the top (apple.com style) and a centred page. */

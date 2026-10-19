@@ -4,6 +4,7 @@ import com.jobtrack.config.GmailProperties;
 import com.jobtrack.dto.gmail.ConnectUrlResponse;
 import com.jobtrack.dto.gmail.EmailEventResponse;
 import com.jobtrack.dto.gmail.GmailStatusResponse;
+import com.jobtrack.dto.gmail.UpdateReport;
 import com.jobtrack.entity.GmailConnection;
 import com.jobtrack.exception.BadRequestException;
 import com.jobtrack.exception.GmailAuthException;
@@ -118,6 +119,14 @@ public class GmailController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/api/gmail/report")
+    @Operation(summary = "Result of \"Check for Updates\"",
+            description = "The last check's AI summary and status changes, plus the current status of every application.")
+    public UpdateReport report() {
+        Long userId = currentUser.id();
+        return eventService.report(userId, syncService.lastRun(userId).orElse(null));
+    }
+
     @GetMapping("/api/gmail/events")
     @Operation(summary = "Recent emails the AI matched to applications", description = "Newest first.")
     public List<EmailEventResponse> recentEvents(@RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
@@ -133,6 +142,7 @@ public class GmailController {
 
     private GmailStatusResponse statusFor(Long userId) {
         GmailConnection connection = connectionService.find(userId).orElse(null);
+        int[] progress = syncService.progress(userId);
         return new GmailStatusResponse(
                 connectionService.isConfigured(),
                 connection != null,
@@ -140,6 +150,8 @@ public class GmailController {
                 connection == null ? null : connection.getLastSyncedAt(),
                 connection == null ? null : connection.getLastSyncError(),
                 syncService.isSyncing(userId),
+                progress[0],
+                progress[1],
                 syncService.lastRun(userId).orElse(null));
     }
 }

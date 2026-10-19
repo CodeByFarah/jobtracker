@@ -12,7 +12,6 @@ import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RegisterPage } from './pages/RegisterPage'
-import { TasksPage } from './pages/TasksPage'
 
 export default function App() {
   return (
@@ -32,7 +31,6 @@ export default function App() {
               <Route path="/companies" element={<CompaniesPage />} />
               <Route path="/companies/:id" element={<CompanyDetailPage />} />
               <Route path="/interviews" element={<InterviewsPage />} />
-              <Route path="/tasks" element={<TasksPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>

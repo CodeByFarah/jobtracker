@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
@@ -19,7 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * The acceptance workflow from the project brief, end to end through the HTTP API and PostgreSQL:
  * register, log in, create company, create application, change status, view history, schedule an
- * interview, create and complete a task, view the dashboard, search/filter.
+ * interview, view the dashboard, search/filter.
  */
 class JobSearchWorkflowIntegrationTest extends IntegrationTestSupport {
 
@@ -87,29 +86,12 @@ class JobSearchWorkflowIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.status").value("SCHEDULED"))
                 .andExpect(jsonPath("$.companyName").value("Google"));
 
-        // Follow-up task, then complete it
-        long taskId = json(postJson("/api/applications/" + applicationId + "/tasks", token, Map.of(
-                "title", "Prepare for interview", "dueDate", LocalDate.now().plusDays(2).toString()))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.completed").value(false))).get("id").asLong();
-
-        getJson("/api/tasks?completed=false", token).andExpect(jsonPath("$", hasSize(1)));
-
-        patchJson("/api/tasks/" + taskId + "/completion", token, Map.of("completed", true))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.completed").value(true))
-                .andExpect(jsonPath("$.completedAt", notNullValue()));
-
-        getJson("/api/tasks?completed=false", token).andExpect(jsonPath("$", hasSize(0)));
-        getJson("/api/tasks?completed=true", token).andExpect(jsonPath("$", hasSize(1)));
-
         // Dashboard reflects the real data
         JsonNode dashboard = json(getJson("/api/dashboard", token).andExpect(status().isOk()));
         assertThat(dashboard.get("totalApplications").asLong()).isEqualTo(1);
         assertThat(dashboard.get("activeApplications").asLong()).isEqualTo(1);
         assertThat(dashboard.get("totalInterviews").asLong()).isEqualTo(1);
         assertThat(dashboard.get("upcomingInterviewCount").asLong()).isEqualTo(1);
-        assertThat(dashboard.get("outstandingTasks").asLong()).isZero();
         assertThat(dashboard.get("offers").asLong()).isZero();
         assertThat(dashboard.get("upcomingInterviews")).hasSize(1);
         assertThat(dashboard.get("statusBreakdown")).hasSize(8);

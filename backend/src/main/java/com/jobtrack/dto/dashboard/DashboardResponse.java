@@ -1,7 +1,6 @@
 package com.jobtrack.dto.dashboard;
 
 import com.jobtrack.dto.interview.InterviewResponse;
-import com.jobtrack.dto.task.TaskResponse;
 import com.jobtrack.entity.ApplicationStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -19,14 +18,11 @@ public record DashboardResponse(
         @Schema(description = "Applications that ever reached OFFER (per status history)")
         long offers,
         long rejected,
-        long outstandingTasks,
-        long overdueTasks,
         @Schema(description = "Count per status, in pipeline order, including zero counts")
         List<StatusCountResponse> statusBreakdown,
         @Schema(description = "Applications per month (by application date) for the last 6 months")
         List<MonthCountResponse> applicationsPerMonth,
-        List<InterviewResponse> upcomingInterviews,
-        List<TaskResponse> upcomingTasks) {
+        List<InterviewResponse> upcomingInterviews) {
 
     public record StatusCountResponse(ApplicationStatus status, long count) {
     }

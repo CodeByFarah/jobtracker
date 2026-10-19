@@ -130,7 +130,7 @@ public class ApplicationService {
         return ApplicationMapper.toResponse(application);
     }
 
-    /** Deletes the application; its history, interviews and tasks are removed by ON DELETE CASCADE. */
+    /** Deletes the application; its history, interviews and email records are removed by ON DELETE CASCADE. */
     @Transactional
     public void delete(Long userId, Long applicationId) {
         applicationRepository.delete(getOwnedApplication(userId, applicationId));

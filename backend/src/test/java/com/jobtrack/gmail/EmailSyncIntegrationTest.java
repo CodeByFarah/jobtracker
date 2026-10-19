@@ -35,6 +35,8 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
     GmailApiClient gmail;
     @MockitoBean
     EmailClassifier classifier;
+    @MockitoBean
+    UpdateSummaryWriter summaryWriter;
 
     @Autowired
     EmailSyncService syncService;
@@ -70,6 +72,7 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
         when(classifier.classify(argThat(m -> m != null && m.id().equals("m-new")), any()))
                 .thenReturn(new EmailClassification(globex, EmailCategory.INTERVIEW, 0.9, "Globex wants a call."));
 
+        when(summaryWriter.write(any(), any(), anyInt(), any())).thenReturn("Acme said no; Globex wants to talk.");
         syncService.syncNow(userId);
 
         getJson("/api/applications/" + acme, token).andExpect(jsonPath("$.status").value("REJECTED"));
@@ -93,6 +96,14 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.connected").value(true))
                 .andExpect(jsonPath("$.lastSyncedAt").isNotEmpty())
                 .andExpect(jsonPath("$.lastRun.statusesUpdated").value(2));
+        // The report behind "Check for Updates": AI summary, every change, and every application.
+        getJson("/api/gmail/report", token)
+                .andExpect(jsonPath("$.lastCheck.overview").value("Acme said no; Globex wants to talk."))
+                .andExpect(jsonPath("$.lastCheck.changes.length()").value(2))
+                .andExpect(jsonPath("$.lastCheck.changes[0].to").value("REJECTED"))
+                .andExpect(jsonPath("$.applications.length()").value(2))
+                .andExpect(jsonPath("$.applications[0].changedInLastCheck").value(true))
+                .andExpect(jsonPath("$.applications[?(@.companyName == 'Globex')].lastEmailSummary").value(org.hamcrest.Matchers.contains("Globex wants a call.")));
 
         // A second run sees the same ids again but doesn't re-read or re-apply them.
         syncService.syncNow(userId);

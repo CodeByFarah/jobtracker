@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { gmailApi } from '../services/api'
 import { pluralize, timeAgo } from '../utils/format'
+import { CheckUpdatesButton } from './CheckUpdates'
 import { ConfirmDialog } from './ConfirmDialog'
 import { EmailEventList } from './EmailEventList'
 import { Icon } from './Icon'
@@ -66,11 +67,6 @@ export function GmailCard() {
     act(async () => {
       const { url } = await gmailApi.connectUrl()
       window.location.assign(url)
-    })
-  const syncNow = () =>
-    act(async () => {
-      const next = await gmailApi.sync()
-      status.setData(() => next)
     })
 
   const data = status.data
@@ -147,9 +143,12 @@ export function GmailCard() {
             </p>
           )}
           <div className="gmail-actions">
-            <button type="button" className="button button-secondary" onClick={syncNow} disabled={busy || data.syncing}>
-              <Icon name="refresh" /> {data.syncing ? 'Checking…' : 'Check now'}
-            </button>
+            <CheckUpdatesButton
+              onUpdated={() => {
+                status.reload()
+                events.reload()
+              }}
+            />
             {data.lastSyncError && (
               <button type="button" className="button button-secondary" onClick={connect} disabled={busy}>
                 Reconnect

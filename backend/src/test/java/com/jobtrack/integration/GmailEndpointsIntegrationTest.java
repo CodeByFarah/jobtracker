@@ -2,6 +2,7 @@ package com.jobtrack.integration;
 
 import com.jobtrack.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.Map;
 
@@ -11,7 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Gmail endpoints without Google credentials configured (the default for a fresh checkout). */
+/**
+ * Gmail endpoints without Google credentials configured (the default for a fresh checkout).
+ * The credentials are blanked explicitly so a developer's local .env doesn't change the result.
+ */
+@TestPropertySource(properties = {"GOOGLE_CLIENT_ID=", "GOOGLE_CLIENT_SECRET="})
 class GmailEndpointsIntegrationTest extends IntegrationTestSupport {
 
     @Test
@@ -38,7 +43,7 @@ class GmailEndpointsIntegrationTest extends IntegrationTestSupport {
         // A forged state never connects anything; the browser is sent back to the profile page with an error.
         mockMvc.perform(get("/api/gmail/oauth/callback").param("code", "abc").param("state", "forged"))
                 .andExpect(status().isFound())
-                .andExpect(header().string("Location", containsString("/profile?gmail=error")));
+                .andExpect(header().string("Location", containsString("/gmail/done?gmail=error")));
     }
 
     @Test

@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { gmailApi } from '../services/api'
 import { pluralize, timeAgo } from '../utils/format'
-import { CheckUpdatesButton } from './CheckUpdates'
+import { useGmailConnect } from '../hooks/useGmailConnect'
+import { CheckUpdatesButton, UpdatesDialog } from './CheckUpdates'
 import { ConfirmDialog } from './ConfirmDialog'
 import { EmailEventList } from './EmailEventList'
 import { Icon } from './Icon'
@@ -12,18 +13,24 @@ import { ErrorState, LoadingState } from './States'
 const POLL_MS = 5000
 
 /**
- * Gmail connection + AI email tracking. Connecting sends the browser to Google; Google sends it
- * back to /profile?gmail=connected (or ?gmail=error&reason=...), which this card reports.
+ * Gmail connection + AI email tracking. Connecting opens Google sign-in in a popup and then runs
+ * the first check in the updates dialog. If the popup was blocked, the whole tab goes to Google
+ * and comes back to /profile?gmail=connected (or ?gmail=error&reason=...), which this card reports.
  */
 export function GmailCard() {
   const status = useAsync(() => gmailApi.status(), [])
   const events = useAsync(() => gmailApi.events(10), [])
   const [params, setParams] = useSearchParams()
-  const [busy, setBusy] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [flash] = useState(() => ({ result: params.get('gmail'), reason: params.get('reason') }))
   const wasSyncing = useRef(false)
+  // Back from a full-tab sign-in (popup blocked): go straight into the first check.
+  const [checking, setChecking] = useState(() => params.get('gmail') === 'connected')
+  const gmail = useGmailConnect(() => {
+    status.reload()
+    setChecking(true)
+  })
+  const waiting = gmail.state.kind === 'waiting'
 
   // Drop ?gmail=... from the URL so a reload doesn't show the message again.
   useEffect(() => {
@@ -51,24 +58,6 @@ export function GmailCard() {
     }
   }, [syncing, reloadStatus, reloadEvents])
 
-  async function act(action: () => Promise<void>) {
-    setBusy(true)
-    setActionError(null)
-    try {
-      await action()
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const connect = () =>
-    act(async () => {
-      const { url } = await gmailApi.connectUrl()
-      window.location.assign(url)
-    })
-
   const data = status.data
   return (
     <section className="card narrow-card" aria-labelledby="gmail-heading">
@@ -92,9 +81,17 @@ export function GmailCard() {
           Couldn’t connect Gmail. {flash.reason}
         </p>
       )}
-      {actionError && (
+      {waiting && (
+        <p className="notice" role="status">
+          Finish signing in in the Google window. It closes by itself when you’re done.{' '}
+          <button type="button" className="button button-ghost" onClick={gmail.cancel}>
+            Cancel
+          </button>
+        </p>
+      )}
+      {gmail.state.kind === 'error' && (
         <p className="notice notice-error" role="alert">
-          {actionError}
+          Couldn’t connect Gmail. {gmail.state.message}
         </p>
       )}
 
@@ -110,8 +107,8 @@ export function GmailCard() {
 
       {data && data.configured && !data.connected && (
         <div className="gmail-actions">
-          <button type="button" className="button button-primary" onClick={connect} disabled={busy}>
-            <Icon name="mail" /> {busy ? 'Opening Google…' : 'Connect Gmail'}
+          <button type="button" className="button button-primary" onClick={gmail.connect} disabled={waiting}>
+            <Icon name="mail" /> {waiting ? 'Waiting for Google…' : 'Connect Gmail'}
           </button>
         </div>
       )}
@@ -150,11 +147,11 @@ export function GmailCard() {
               }}
             />
             {data.lastSyncError && (
-              <button type="button" className="button button-secondary" onClick={connect} disabled={busy}>
+              <button type="button" className="button button-secondary" onClick={gmail.connect} disabled={waiting}>
                 Reconnect
               </button>
             )}
-            <button type="button" className="button button-ghost-danger" onClick={() => setConfirmDisconnect(true)} disabled={busy}>
+            <button type="button" className="button button-ghost-danger" onClick={() => setConfirmDisconnect(true)} disabled={waiting}>
               Disconnect
             </button>
           </div>
@@ -168,6 +165,16 @@ export function GmailCard() {
           )}
           {events.data && events.data.length > 0 && <EmailEventList events={events.data} showApplication />}
         </>
+      )}
+
+      {checking && (
+        <UpdatesDialog
+          onClose={() => {
+            setChecking(false)
+            status.reload()
+            events.reload()
+          }}
+        />
       )}
 
       {confirmDisconnect && (

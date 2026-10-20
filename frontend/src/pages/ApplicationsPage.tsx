@@ -106,7 +106,7 @@ export function ApplicationsPage() {
         </div>
       </header>
 
-      <GmailPrompt />
+      <GmailPrompt onUpdated={results.reload} />
 
       <div className="toolbar">
         <SearchBar value={search} onChange={onSearch} placeholder="Search job title or company" label="Search applications" />

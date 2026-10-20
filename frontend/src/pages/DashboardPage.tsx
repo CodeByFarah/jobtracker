@@ -49,7 +49,7 @@ export function DashboardPage() {
         </div>
       </header>
 
-      <GmailPrompt />
+      <GmailPrompt onUpdated={reloadAll} />
 
       {dashboard.error && !d && <ErrorState error={dashboard.error} onRetry={dashboard.reload} />}
       {dashboard.loading && !d && <LoadingState />}

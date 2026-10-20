@@ -11,6 +11,7 @@ import { InterviewsPage } from './pages/InterviewsPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { GmailDonePage } from './pages/GmailDonePage'
 import { RegisterPage } from './pages/RegisterPage'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/gmail/done" element={<GmailDonePage />} />
           <Route element={<PublicOnly />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />

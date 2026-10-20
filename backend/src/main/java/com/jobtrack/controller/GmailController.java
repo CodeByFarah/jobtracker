@@ -70,14 +70,15 @@ public class GmailController {
 
     /**
      * Google redirects the browser here after sign-in. There is no bearer token on this request:
-     * the signed {@code state} identifies the user. Always redirects back to the frontend.
+     * the signed {@code state} identifies the user. Always redirects to the frontend's /gmail/done
+     * page, which hands the result to the JobTrack tab that opened the sign-in popup.
      */
     @GetMapping("/api/gmail/oauth/callback")
     @Operation(summary = "OAuth callback (called by Google)")
     public ResponseEntity<Void> oauthCallback(@RequestParam(required = false) String code,
                                               @RequestParam(required = false) String state,
                                               @RequestParam(required = false) String error) {
-        UriComponentsBuilder target = UriComponentsBuilder.fromUriString(properties.frontendUrl() + "/profile");
+        UriComponentsBuilder target = UriComponentsBuilder.fromUriString(properties.frontendUrl() + "/gmail/done");
         if (error != null || code == null || state == null) {
             target.queryParam("gmail", "error")
                     .queryParam("reason", error != null ? "Google sign-in was cancelled." : "Google sent an incomplete response.");

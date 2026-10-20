@@ -80,12 +80,6 @@ export const gmailApi = {
   report: () => http.get<UpdateReport>('/api/gmail/report'),
 }
 
-/** Sends the browser to Google's consent page; Google sends it back to /profile?gmail=connected. */
-export async function connectGmail() {
-  const { url } = await gmailApi.connectUrl()
-  window.location.assign(url)
-}
-
 export const interviewApi = {
   list: (scope: 'ALL' | 'UPCOMING' | 'PAST') => http.get<Interview[]>(`/api/interviews${buildQuery({ scope })}`),
   update: (id: number, body: InterviewInput) => http.put<Interview>(`/api/interviews/${id}`, body),

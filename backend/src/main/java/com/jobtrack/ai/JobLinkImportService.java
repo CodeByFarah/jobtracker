@@ -75,7 +75,7 @@ public class JobLinkImportService {
         }
         if (result.jobTitle() == null && result.companyName() == null) {
             throw new BadRequestException("url",
-                    "Couldn't find a job posting on that page. Check the link, or add the job manually.");
+                    "Couldn't find a job posting on that page. Check the link, or try the job on the company's own careers page.");
         }
 
         String companyName = JobPostingParser.truncate(result.companyName(), 149);
@@ -194,7 +194,7 @@ public class JobLinkImportService {
                 if (response.statusCode() >= 400) {
                     throw new BadRequestException("url", "The website refused to show the page (HTTP "
                             + response.statusCode() + "). Some sites, like LinkedIn, block automatic reading: "
-                            + "try the job on the company's own careers page, or add it manually.");
+                            + "try the same job on the company's own careers page.");
                 }
                 byte[] bytes = body.readNBytes(MAX_PAGE_BYTES);
                 return new String(bytes, charsetOf(response));

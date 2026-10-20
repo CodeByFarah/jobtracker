@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Application } from '../types/api'
 import { EMPLOYMENT_LABELS, formatDate, formatSalary } from '../utils/format'
+import { CompanyLogo } from './CompanyLogo'
 import { NoReplyBadge, StatusBadge } from './StatusBadge'
 
 /**
@@ -11,13 +12,23 @@ export function ApplicationCard({ application, showCompany = true }: { applicati
   const salary = formatSalary(application.salaryMin, application.salaryMax, application.salaryCurrency)
   return (
     <Link to={`/applications/${application.id}`} className="app-row">
-      <div className="app-row-main">
-        <span className="app-row-title">{application.jobTitle}</span>
-        <span className="app-row-sub">
-          {showCompany && <span className="app-row-company">{application.company.name}</span>}
-          {application.employmentType && <span>{EMPLOYMENT_LABELS[application.employmentType]}</span>}
-          {salary && <span>{salary}</span>}
-        </span>
+      <div className="app-row-lead">
+        {showCompany && (
+          <CompanyLogo
+            companyId={application.company.id}
+            name={application.company.name}
+            logoUpdatedAt={application.company.logoUpdatedAt}
+            size="small"
+          />
+        )}
+        <div className="app-row-main">
+          <span className="app-row-title">{application.jobTitle}</span>
+          <span className="app-row-sub">
+            {showCompany && <span className="app-row-company">{application.company.name}</span>}
+            {application.employmentType && <span>{EMPLOYMENT_LABELS[application.employmentType]}</span>}
+            {salary && <span>{salary}</span>}
+          </span>
+        </div>
       </div>
       <span className="app-row-location">{application.location ?? '—'}</span>
       <span className="app-row-date">

@@ -70,7 +70,9 @@ public class EmailEventService {
                     return new ApplicationUpdate(
                             application.getId(),
                             application.getJobTitle(),
+                            application.getCompany().getId(),
                             application.getCompany().getName(),
+                            application.getCompany().getLogoUpdatedAt(),
                             application.getStatus(),
                             application.getApplicationDate(),
                             application.getUpdatedAt(),

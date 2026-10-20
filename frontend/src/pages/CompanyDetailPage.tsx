@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApplicationCard, ApplicationListHeader } from '../components/ApplicationCard'
+import { CompanyLogo } from '../components/CompanyLogo'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { CompanyFormModal } from '../components/forms/CompanyFormModal'
 import { Icon } from '../components/Icon'
@@ -9,6 +10,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/States'
 import { useAddApplication } from '../hooks/useAddApplication'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useLogoArrival } from '../hooks/useLogoArrival'
 import { companyApi } from '../services/api'
 
 export function CompanyDetailPage() {
@@ -19,6 +21,7 @@ export function CompanyDetailPage() {
   const [dialog, setDialog] = useState<'edit' | 'delete' | null>(null)
   const add = useAddApplication()
   useDocumentTitle(company.data?.name ?? 'Company')
+  useLogoArrival(company.data && !company.data.logoUpdatedAt, company.reload)
 
   const back = (
     <Link to="/companies" className="back-link">
@@ -42,9 +45,7 @@ export function CompanyDetailPage() {
       {back}
       <header className="page-header detail-header">
         <div className="company-card-head">
-          <span className="company-avatar company-avatar-large" aria-hidden="true">
-            {c.name.charAt(0).toUpperCase()}
-          </span>
+          <CompanyLogo companyId={c.id} name={c.name} logoUpdatedAt={c.logoUpdatedAt} size="large" />
           <div>
             <h1>{c.name}</h1>
             <p className="detail-subtitle">{[c.industry, c.location].filter(Boolean).join(' · ') || 'No details yet'}</p>

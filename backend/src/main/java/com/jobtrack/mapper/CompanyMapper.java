@@ -10,7 +10,7 @@ public final class CompanyMapper {
 
     public static CompanyResponse toResponse(Company company, long applicationCount) {
         return new CompanyResponse(company.getId(), company.getName(), company.getWebsite(), company.getIndustry(),
-                company.getLocation(), company.getNotes(), applicationCount, company.getCreatedAt(),
-                company.getUpdatedAt());
+                company.getLocation(), company.getNotes(), applicationCount, company.getLogoUpdatedAt(),
+                company.getCreatedAt(), company.getUpdatedAt());
     }
 }

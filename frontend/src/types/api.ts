@@ -46,6 +46,8 @@ export interface Company {
   location: string | null
   notes: string | null
   applicationCount: number
+  /** When the logo last changed; null while there is none. */
+  logoUpdatedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -61,7 +63,7 @@ export interface CompanyInput {
 export interface Application {
   id: number
   jobTitle: string
-  company: { id: number; name: string }
+  company: { id: number; name: string; logoUpdatedAt: string | null }
   jobUrl: string | null
   location: string | null
   employmentType: EmploymentType | null
@@ -213,7 +215,9 @@ export interface GmailStatus {
 export interface ApplicationUpdate {
   id: number
   jobTitle: string
+  companyId: number
   companyName: string
+  companyLogoUpdatedAt: string | null
   status: ApplicationStatus
   applicationDate: string | null
   updatedAt: string

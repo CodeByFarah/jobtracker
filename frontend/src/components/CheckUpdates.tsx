@@ -4,6 +4,7 @@ import { useGmailConnect } from '../hooks/useGmailConnect'
 import { gmailApi } from '../services/api'
 import type { GmailStatus, UpdateReport } from '../types/api'
 import { formatInstantDate, pluralize, STATUS_LABELS } from '../utils/format'
+import { CompanyLogo } from './CompanyLogo'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { StatusBadge } from './StatusBadge'
@@ -261,6 +262,12 @@ function Report({ report, onNavigate }: { report: UpdateReport; onNavigate: () =
           <ul className="report-list">
             {report.applications.map((app) => (
               <li key={app.id} className={`report-item ${app.changedInLastCheck ? 'report-item-new' : ''}`}>
+                <CompanyLogo
+                  companyId={app.companyId}
+                  name={app.companyName}
+                  logoUpdatedAt={app.companyLogoUpdatedAt}
+                  size="small"
+                />
                 <div className="report-item-main">
                   <Link to={`/applications/${app.id}`} onClick={onNavigate} className="report-item-title">
                     {app.companyName} · {app.jobTitle}

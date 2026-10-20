@@ -16,7 +16,7 @@ public final class ApplicationMapper {
         return new ApplicationResponse(
                 application.getId(),
                 application.getJobTitle(),
-                new ApplicationResponse.CompanySummary(company.getId(), company.getName()),
+                new ApplicationResponse.CompanySummary(company.getId(), company.getName(), company.getLogoUpdatedAt()),
                 application.getJobUrl(),
                 application.getLocation(),
                 application.getEmploymentType(),

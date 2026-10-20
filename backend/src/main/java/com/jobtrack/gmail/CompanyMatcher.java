@@ -57,7 +57,7 @@ public final class CompanyMatcher {
     }
 
     /** "Acme Corp, Inc." -> "acme": lower case, accents and punctuation removed, legal suffixes dropped. */
-    static String coreName(String name) {
+    public static String coreName(String name) {
         String normalized = normalize(name);
         boolean changed = true;
         while (changed) {
@@ -72,7 +72,7 @@ public final class CompanyMatcher {
         return normalized;
     }
 
-    static String normalize(String text) {
+    public static String normalize(String text) {
         if (text == null) {
             return "";
         }
@@ -83,7 +83,7 @@ public final class CompanyMatcher {
                 .strip();
     }
 
-    static String senderDomain(String from) {
+    public static String senderDomain(String from) {
         if (from == null) {
             return null;
         }

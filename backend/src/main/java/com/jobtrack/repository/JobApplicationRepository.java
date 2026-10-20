@@ -41,6 +41,9 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
     boolean existsByCompanyId(Long companyId);
 
+    /** Not ownership-scoped: only for background work on a company already loaded by id. */
+    List<JobApplication> findByCompanyIdOrderByUpdatedAtDesc(Long companyId);
+
     long countByCompanyId(Long companyId);
 
     @Query("""

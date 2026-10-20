@@ -11,7 +11,9 @@ import java.time.LocalDate;
 public record ApplicationUpdate(
         Long id,
         String jobTitle,
+        Long companyId,
         String companyName,
+        Instant companyLogoUpdatedAt,
         ApplicationStatus status,
         LocalDate applicationDate,
         Instant updatedAt,

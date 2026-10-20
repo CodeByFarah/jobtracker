@@ -20,7 +20,7 @@ public final class JobEmailFilter {
      * (LinkedIn, Indeed, Kariyer.net…) are not listed: most of their mail is alerts, and their
      * application emails ("Your application was sent to…") are caught by the wording instead.
      */
-    static final List<String> HIRING_DOMAINS = List.of(
+    public static final List<String> HIRING_DOMAINS = List.of(
             "greenhouse.io", "greenhouse-mail.io", "lever.co", "myworkday.com", "workday.com",
             "smartrecruiters.com", "ashbyhq.com", "icims.com", "taleo.net", "successfactors.com",
             "successfactors.eu", "jobvite.com", "bamboohr.com", "workable.com", "recruitee.com", "teamtailor.com",

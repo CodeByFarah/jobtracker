@@ -1,15 +1,14 @@
 import { Link } from 'react-router-dom'
 import type { Company } from '../types/api'
 import { pluralize } from '../utils/format'
+import { CompanyLogo } from './CompanyLogo'
 import { Icon } from './Icon'
 
 export function CompanyCard({ company }: { company: Company }) {
   return (
     <Link to={`/companies/${company.id}`} className="card company-card">
       <div className="company-card-head">
-        <span className="company-avatar" aria-hidden="true">
-          {company.name.charAt(0).toUpperCase()}
-        </span>
+        <CompanyLogo companyId={company.id} name={company.name} logoUpdatedAt={company.logoUpdatedAt} />
         <div>
           <h3>{company.name}</h3>
           {company.industry && <p className="muted">{company.industry}</p>}

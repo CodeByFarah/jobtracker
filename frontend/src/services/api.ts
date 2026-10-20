@@ -80,6 +80,24 @@ export const gmailApi = {
   report: () => http.get<UpdateReport>('/api/gmail/report'),
 }
 
+const logoCache = new Map<string, Promise<string | null>>()
+
+/**
+ * A company logo as an object URL (the image needs the auth header, so a plain <img src> can't
+ * load it). Cached per company and logo version, so every list reuses one download.
+ */
+export function companyLogoUrl(companyId: number, version: string): Promise<string | null> {
+  const key = `${companyId}:${version}`
+  let url = logoCache.get(key)
+  if (!url) {
+    url = http
+      .blob(`/api/companies/${companyId}/logo?v=${encodeURIComponent(version)}`)
+      .then((blob) => (blob ? URL.createObjectURL(blob) : null))
+    logoCache.set(key, url)
+  }
+  return url
+}
+
 export const interviewApi = {
   list: (scope: 'ALL' | 'UPCOMING' | 'PAST') => http.get<Interview[]>(`/api/interviews${buildQuery({ scope })}`),
   update: (id: number, body: InterviewInput) => http.put<Interview>(`/api/interviews/${id}`, body),

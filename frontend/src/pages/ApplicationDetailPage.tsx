@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { CompanyLogo } from '../components/CompanyLogo'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ApplicationFormModal } from '../components/forms/ApplicationFormModal'
 import { InterviewFormModal } from '../components/forms/InterviewFormModal'
@@ -11,6 +12,7 @@ import { NoReplyBadge, StatusBadge } from '../components/StatusBadge'
 import { StatusTimeline } from '../components/StatusTimeline'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useLogoArrival } from '../hooks/useLogoArrival'
 import { applicationApi, interviewApi } from '../services/api'
 import type { Application, ApplicationStatus, Interview } from '../types/api'
 import { EMPLOYMENT_LABELS, formatDate, formatInstantDate, formatSalary, STATUS_LABELS } from '../utils/format'
@@ -38,6 +40,7 @@ export function ApplicationDetailPage() {
 
   const app = application.data
   useDocumentTitle(app ? `${app.jobTitle} at ${app.company.name}` : 'Application')
+  useLogoArrival(app && !app.company.logoUpdatedAt, application.reload)
 
   if (application.error && !app) {
     return (
@@ -75,16 +78,24 @@ export function ApplicationDetailPage() {
     <>
       <BackLink />
       <header className="page-header detail-header">
-        <div>
-          <div className="detail-title">
-            <h1>{app.jobTitle}</h1>
-            <StatusBadge status={app.status} />
-            <NoReplyBadge application={app} />
+        <div className="company-card-head">
+          <CompanyLogo
+            companyId={app.company.id}
+            name={app.company.name}
+            logoUpdatedAt={app.company.logoUpdatedAt}
+            size="large"
+          />
+          <div>
+            <div className="detail-title">
+              <h1>{app.jobTitle}</h1>
+              <StatusBadge status={app.status} />
+              <NoReplyBadge application={app} />
+            </div>
+            <p className="detail-subtitle">
+              <Link to={`/companies/${app.company.id}`}>{app.company.name}</Link>
+              {app.location && <span> · {app.location}</span>}
+            </p>
           </div>
-          <p className="detail-subtitle">
-            <Link to={`/companies/${app.company.id}`}>{app.company.name}</Link>
-            {app.location && <span> · {app.location}</span>}
-          </p>
         </div>
         <div className="header-actions">
           <button type="button" className="button button-secondary" onClick={() => setDialog({ kind: 'edit' })}>

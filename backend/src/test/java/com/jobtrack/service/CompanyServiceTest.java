@@ -6,6 +6,7 @@ import com.jobtrack.entity.Company;
 import com.jobtrack.entity.User;
 import com.jobtrack.exception.ConflictException;
 import com.jobtrack.exception.ResourceNotFoundException;
+import com.jobtrack.logo.CompanyLogoService;
 import com.jobtrack.repository.CompanyApplicationCount;
 import com.jobtrack.repository.CompanyRepository;
 import com.jobtrack.repository.JobApplicationRepository;
@@ -39,6 +40,8 @@ class CompanyServiceTest {
     JobApplicationRepository applicationRepository;
     @Mock
     UserRepository userRepository;
+    @Mock
+    CompanyLogoService logoService;
     @InjectMocks
     CompanyService service;
 

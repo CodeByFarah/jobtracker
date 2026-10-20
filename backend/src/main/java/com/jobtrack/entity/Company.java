@@ -7,6 +7,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "companies")
 public class Company extends AuditableEntity {
@@ -26,6 +28,10 @@ public class Company extends AuditableEntity {
 
     @Column(columnDefinition = "text")
     private String notes;
+
+    /** When the stored logo last changed; null when there is no logo. Written by CompanyLogoService. */
+    @Column(name = "logo_updated_at", insertable = false, updatable = false)
+    private Instant logoUpdatedAt;
 
     protected Company() {
     }
@@ -77,5 +83,9 @@ public class Company extends AuditableEntity {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public Instant getLogoUpdatedAt() {
+        return logoUpdatedAt;
     }
 }

@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -87,6 +90,21 @@ public class CompanyController {
     @ApiResponse(responseCode = "404", description = "Not found or not owned by the caller")
     public List<ApplicationResponse> applications(@PathVariable Long id) {
         return companyService.listApplications(currentUser.id(), id);
+    }
+
+    @GetMapping("/{id}/logo")
+    @Operation(summary = "Get a company's logo", description = "Found automatically from the company's website.")
+    @ApiResponse(responseCode = "404", description = "No logo yet, or the company isn't the caller's")
+    public ResponseEntity<byte[]> logo(@PathVariable Long id) {
+        return companyService.logo(currentUser.id(), id)
+                .map(logo -> ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(logo.getContentType()))
+                        // The URL carries the logo's version (?v=), so a week of caching is safe.
+                        .cacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePrivate())
+                        .header("X-Content-Type-Options", "nosniff")
+                        .header("Content-Security-Policy", "default-src 'none'; sandbox")
+                        .body(logo.getImage()))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     private static URI locationOf(Long id) {

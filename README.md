@@ -13,6 +13,7 @@ frontend. Every number and list in the UI comes from the database; nothing is mo
 
 - **Accounts.** Register, log in and log out, and edit your profile. Passwords are hashed with BCrypt, and the API uses stateless JWT authentication.
 - **Companies.** Create, search, edit and delete companies, and see each company's applications.
+- **Company logos.** Every company gets its logo automatically, shown on company cards, application lists, detail pages and the update report. JobTrack works out the company's website (from its website field, job link, email senders, or a company-name lookup) and stores the large icon the site publishes for itself. Companies without one get a coloured initial. Only the company's name (for the lookup, via Clearbit's free autocomplete) and its public website are contacted; set `jobtrack.logos.enabled=false` to turn this off.
 - **Applications.** Track title, company, URL, location, employment type, salary range, application date and notes.
 - **Status workflow.** Statuses run `SAVED → APPLIED → SCREENING → INTERVIEW → OFFER → ACCEPTED`, and `REJECTED` / `WITHDRAWN` can be reached from any open stage. Only valid transitions are allowed.
 - **Status history.** Every status change is recorded with the previous status, the new status and a timestamp, and shown as a timeline.
@@ -90,6 +91,7 @@ users ─┬─< companies ──┐
 | `applications` | Owned by a user and linked to one of their companies. Check constraints on status, employment type and salary range (`salary_min <= salary_max`). |
 | `application_status_history` | `previous_status` (null for the initial entry), `new_status`, `changed_at`. |
 | `interviews` | Type, scheduled time, duration, interviewer, location/link, notes, status. |
+| `company_logos` | One per company: the logo image (bytea), its type and where it came from. Kept out of `companies` so lists never load images; `companies.logo_updated_at` versions it. |
 | `gmail_connections` | One per user: Gmail address, AES-GCM encrypted refresh token, last check time and error. |
 | `email_events` | Every email the AI read: category, confidence, one-line summary, and the status change it caused. Unique per Gmail message, so nothing is read twice. |
 
@@ -230,7 +232,7 @@ No local database or configuration is needed.
 | Unit tests (JUnit 5 + Mockito) | Status transitions and history, application creation and update, validation rules, ownership (not-found for foreign ids), company creation, duplicate names and deletion rules, interview date rules, email status rules and the update summary, dashboard calculations (zero-filling, time zones), registration and login. |
 | Integration tests (`@SpringBootTest` + MockMvc + Testcontainers) | The full acceptance workflow (register → … → dashboard → search). User A vs. user B on every resource type. Page size, page number and filters combined with pagination. Sorting. Validation and error bodies. Transaction rollback when the history insert fails. |
 
-132 tests; all pass (plus the opt-in live AI test described under *AI features*).
+136 tests; all pass (plus the opt-in live tests: real AI with `-Dollama.live=true`, real company logos with `-Dlogos.live=true`).
 
 ## Setup
 
@@ -311,6 +313,7 @@ Endpoint overview. Everything except register and login requires a bearer token.
 | GET / POST | `/api/companies` | List (`?q=` name search) / create |
 | GET / PUT / DELETE | `/api/companies/{id}` | Read / update / delete (409 if it has applications) |
 | GET | `/api/companies/{id}/applications` | A company's applications |
+| GET | `/api/companies/{id}/logo` | The company's logo image (404 until one is found) |
 | GET / POST | `/api/applications` | Search & paginate (`q`, `status`, `location`, `employmentType`, `companyId`, `sort`, `direction`, `page`, `size`) / create |
 | GET / PUT / DELETE | `/api/applications/{id}` | Read / update details / delete |
 | PATCH | `/api/applications/{id}/status` | Change status (409 on an invalid transition) |

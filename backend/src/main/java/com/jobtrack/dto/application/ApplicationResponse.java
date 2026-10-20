@@ -26,6 +26,10 @@ public record ApplicationResponse(
         Instant createdAt,
         Instant updatedAt) {
 
-    public record CompanySummary(Long id, String name) {
+    public record CompanySummary(
+            Long id,
+            String name,
+            @Schema(description = "When the company logo last changed; null when there is none (see GET /api/companies/{id}/logo)")
+            Instant logoUpdatedAt) {
     }
 }

@@ -88,6 +88,9 @@ public class ApplicationService {
 
         applicationRepository.save(application);
         recordStatusChange(application, null, status);
+        if (application.getJobUrl() != null) {
+            companyService.lookUpLogoIfMissing(company);
+        }
         return ApplicationMapper.toResponse(application);
     }
 

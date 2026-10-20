@@ -115,7 +115,19 @@ function safeParse(text: string): unknown {
   }
 }
 
+/** An authenticated binary download (e.g. an image); null when it isn't there or can't be loaded. */
+async function requestBlob(path: string): Promise<Blob | null> {
+  const token = tokenStore.get()
+  try {
+    const response = await fetch(API_BASE + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    return response.ok ? await response.blob() : null
+  } catch {
+    return null
+  }
+}
+
 export const http = {
+  blob: requestBlob,
   get: <T>(path: string) => request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),

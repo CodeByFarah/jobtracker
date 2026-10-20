@@ -4,8 +4,10 @@ import com.jobtrack.dto.application.ApplicationResponse;
 import com.jobtrack.dto.company.CompanyRequest;
 import com.jobtrack.dto.company.CompanyResponse;
 import com.jobtrack.entity.Company;
+import com.jobtrack.entity.CompanyLogo;
 import com.jobtrack.exception.ConflictException;
 import com.jobtrack.exception.ResourceNotFoundException;
+import com.jobtrack.logo.CompanyLogoService;
 import com.jobtrack.mapper.ApplicationMapper;
 import com.jobtrack.mapper.CompanyMapper;
 import com.jobtrack.mapper.TextUtils;
@@ -18,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,12 +30,14 @@ public class CompanyService {
     private final CompanyRepository companyRepository;
     private final JobApplicationRepository applicationRepository;
     private final UserRepository userRepository;
+    private final CompanyLogoService logoService;
 
     public CompanyService(CompanyRepository companyRepository, JobApplicationRepository applicationRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository, CompanyLogoService logoService) {
         this.companyRepository = companyRepository;
         this.applicationRepository = applicationRepository;
         this.userRepository = userRepository;
+        this.logoService = logoService;
     }
 
     /** Lists the user's companies alphabetically, optionally filtered by a name substring. */
@@ -62,7 +68,9 @@ public class CompanyService {
         }
         Company company = new Company(userRepository.getReferenceById(userId), name);
         applyDetails(company, request);
-        return CompanyMapper.toResponse(companyRepository.save(company), 0);
+        Company saved = companyRepository.save(company);
+        logoService.lookUp(saved.getId());
+        return CompanyMapper.toResponse(saved, 0);
     }
 
     @Transactional
@@ -72,9 +80,14 @@ public class CompanyService {
         if (companyRepository.existsByUserIdAndNameIgnoreCaseAndIdNot(userId, name, companyId)) {
             throw new ConflictException("You already have a company named '" + name + "'");
         }
+        boolean lookAgain = !name.equals(company.getName())
+                || !Objects.equals(TextUtils.clean(request.website()), company.getWebsite());
         company.setName(name);
         applyDetails(company, request);
         companyRepository.flush();
+        if (lookAgain) {
+            logoService.lookUp(companyId);
+        }
         return CompanyMapper.toResponse(company, applicationRepository.countByCompanyId(companyId));
     }
 
@@ -101,6 +114,18 @@ public class CompanyService {
         return applicationRepository.findByCompanyIdAndUserIdOrderByUpdatedAtDesc(companyId, userId).stream()
                 .map(ApplicationMapper::toResponse)
                 .toList();
+    }
+
+    /** A company's new job link may point at its website: look for a logo if there isn't one yet. */
+    void lookUpLogoIfMissing(Company company) {
+        logoService.lookUpIfMissing(company);
+    }
+
+    /** The company's logo image, if one was found. */
+    @Transactional(readOnly = true)
+    public Optional<CompanyLogo> logo(Long userId, Long companyId) {
+        getOwnedCompany(userId, companyId);
+        return logoService.logo(companyId);
     }
 
     /** Returns the company if it belongs to the user; otherwise 404 (not 403) to avoid leaking ids. */

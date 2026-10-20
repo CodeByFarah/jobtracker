@@ -42,7 +42,7 @@ export function DashboardPage() {
         <div className="header-actions">
           <CheckUpdatesButton className="button button-secondary" onUpdated={reloadAll} />
           <button type="button" className="button button-primary" onClick={add.fromLink}>
-            <Icon name="link" /> Add from link
+            <Icon name="plus" /> Add a new application
           </button>
         </div>
       </header>
@@ -59,7 +59,7 @@ export function DashboardPage() {
           text="Paste the link to a job you’ve applied for (or want to) and your local AI fills in the details. Statistics, charts and email updates will appear here."
           action={
             <button type="button" className="button button-primary" onClick={add.fromLink}>
-              <Icon name="link" /> Add from link
+              <Icon name="plus" /> Add a new application
             </button>
           }
         />

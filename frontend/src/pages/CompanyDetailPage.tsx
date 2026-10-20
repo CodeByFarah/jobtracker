@@ -66,7 +66,7 @@ export function CompanyDetailPage() {
             <header className="section-header">
               <h2>Applications</h2>
               <button type="button" className="button button-secondary button-small" onClick={add.fromLink}>
-                <Icon name="link" size={16} /> Add from link
+                <Icon name="plus" size={16} /> Add a new application
               </button>
             </header>
             {applications.error && <ErrorState error={applications.error} onRetry={applications.reload} />}

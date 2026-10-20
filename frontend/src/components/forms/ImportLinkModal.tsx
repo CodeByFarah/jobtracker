@@ -25,7 +25,7 @@ export function ImportLinkModal({ onClose, onImported }: ImportLinkModalProps) {
 
   return (
     <Modal
-      title="Add from a job link"
+      title="Add a new application"
       size="small"
       onClose={onClose}
       footer={

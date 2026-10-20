@@ -280,6 +280,7 @@ code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-si
 .badge-interview-completed { background: var(--st-accepted-bg); color: var(--st-accepted-fg); }
 .badge-interview-cancelled { background: var(--st-withdrawn-bg); color: var(--st-withdrawn-fg); }
 .badge-noreply { background: transparent; color: var(--warning); box-shadow: inset 0 0 0 1px currentColor; }
+.badge-new { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 1px currentColor; }
 
 /* ---------- Forms ---------- */
 .form { display: grid; gap: 18px; }

@@ -70,7 +70,9 @@ public class UpdateSummaryWriter {
         }
         for (StatusChange change : changes) {
             facts.append("- ").append(change.companyName()).append(", ").append(change.jobTitle()).append(": ")
-                    .append(label(change.from())).append(" -> ").append(label(change.to()));
+                    .append(change.from() == null
+                            ? "new application found in the inbox, now " + label(change.to())
+                            : label(change.from()) + " -> " + label(change.to()));
             if (change.emailSummary() != null) {
                 facts.append(" (").append(change.emailSummary()).append(')');
             }
@@ -92,7 +94,9 @@ public class UpdateSummaryWriter {
                     : "Read " + emailsRead + " job email" + (emailsRead == 1 ? "" : "s") + "; no status changed. ");
         } else {
             text.append(changes.stream()
-                    .map(c -> c.companyName() + " moved to " + label(c.to()).toLowerCase(Locale.ROOT))
+                    .map(c -> c.from() == null
+                            ? c.companyName() + " added (" + label(c.to()).toLowerCase(Locale.ROOT) + ")"
+                            : c.companyName() + " moved to " + label(c.to()).toLowerCase(Locale.ROOT))
                     .collect(Collectors.joining("; "))).append(". ");
         }
         if (!applications.isEmpty()) {

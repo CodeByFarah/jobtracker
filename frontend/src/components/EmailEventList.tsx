@@ -31,8 +31,9 @@ export function EmailEventList({ events, showApplication = false }: { events: Em
           {event.summary && <p className="email-item-summary">{event.summary}</p>}
           {event.statusAfter && (
             <p className="email-item-change">
-              Status changed: {event.statusBefore ? STATUS_LABELS[event.statusBefore] : '—'} →{' '}
-              {STATUS_LABELS[event.statusAfter]}
+              {event.statusBefore
+                ? `Status changed: ${STATUS_LABELS[event.statusBefore]} → ${STATUS_LABELS[event.statusAfter]}`
+                : `Added to your applications as ${STATUS_LABELS[event.statusAfter]}`}
             </p>
           )}
           <p className="email-item-meta">

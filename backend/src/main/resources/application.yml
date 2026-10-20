@@ -50,8 +50,8 @@ jobtrack:
     # Through the Vite dev server's /api proxy, so it works whatever port the backend runs on.
     redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/api/gmail/oauth/callback}
     frontend-url: ${FRONTEND_URL:http://localhost:5173}
-    initial-sync-days: ${GMAIL_INITIAL_SYNC_DAYS:60}
-    max-messages-per-sync: ${GMAIL_MAX_MESSAGES_PER_SYNC:300}
+    initial-sync-days: ${GMAIL_INITIAL_SYNC_DAYS:180}
+    max-messages-per-sync: ${GMAIL_MAX_MESSAGES_PER_SYNC:500}
     sync-interval: ${GMAIL_SYNC_INTERVAL:PT30M}
 
 springdoc:

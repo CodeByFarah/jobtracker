@@ -23,10 +23,10 @@ public record GmailProperties(String clientId,
         }
         frontendUrl = frontendUrl.replaceAll("/+$", "");
         if (initialSyncDays <= 0) {
-            initialSyncDays = 60;
+            initialSyncDays = 180;
         }
         if (maxMessagesPerSync <= 0) {
-            maxMessagesPerSync = 300;
+            maxMessagesPerSync = 500;
         }
     }
 

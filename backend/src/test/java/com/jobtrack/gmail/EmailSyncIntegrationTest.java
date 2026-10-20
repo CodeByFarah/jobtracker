@@ -87,7 +87,7 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$[0].statusBefore").value("APPLIED"))
                 .andExpect(jsonPath("$[0].statusAfter").value("REJECTED"))
                 .andExpect(jsonPath("$[0].summary").value("Acme said no."));
-        // Newest first; the shop email never reached the AI because it mentions no tracked company.
+        // Newest first; the shop email never reached the AI: no tracked company and nothing job-like.
         getJson("/api/gmail/events", token)
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].companyName").value("Globex"));
@@ -109,6 +109,57 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
         syncService.syncNow(userId);
         verify(classifier, times(2)).classify(any(), any());
         verify(gmail, times(1)).getMessage("access", "m-old");
+    }
+
+    @Test
+    void emailsAboutUntrackedApplicationsAddThem() throws Exception {
+        String token = registerUser();
+        long userId = json(getJson("/api/users/me", token)).get("id").asLong();
+        GmailConnection connection = new GmailConnection(userRepository.getReferenceById(userId));
+        connection.setGmailAddress("me@gmail.com");
+        connection.setRefreshTokenEncrypted(tokenCipher.encrypt("refresh-" + userId));
+        connectionRepository.save(connection);
+
+        when(gmail.refresh("refresh-" + userId)).thenReturn(new GmailApiClient.Tokens("access3", null, 3600));
+        when(gmail.listMessageIds(eq("access3"), anyString(), anyInt()))
+                .thenReturn(List.of("received", "interview", "alert"));
+        when(gmail.getMessage("access3", "received")).thenReturn(new GmailMessage("received",
+                "jobs-noreply@linkedin.com", "Your application was sent to Initech",
+                Instant.parse("2026-09-20T09:00:00Z"), "Your application for Data Analyst at Initech was sent."));
+        when(gmail.getMessage("access3", "interview")).thenReturn(new GmailMessage("interview",
+                "no-reply@greenhouse.io", "Next steps with Initech", Instant.parse("2026-09-28T09:00:00Z"),
+                "We'd love to set up a call with you."));
+        when(gmail.getMessage("access3", "alert")).thenReturn(new GmailMessage("alert",
+                "jobalerts@linkedin.com", "New jobs for you", Instant.parse("2026-09-25T09:00:00Z"),
+                "Hooli is hiring a Product Manager. Apply now: 30 applicants."));
+        when(classifier.classify(argThat(m -> m != null && m.id().equals("received")), any()))
+                .thenReturn(new EmailClassification(null, EmailCategory.APPLICATION_RECEIVED, 0.95,
+                        "Your Initech application was sent.", "Initech", "Data Analyst"));
+        // The second email doesn't name the job; it still belongs to the Initech application.
+        when(classifier.classify(argThat(m -> m != null && m.id().equals("interview")), any()))
+                .thenReturn(new EmailClassification(null, EmailCategory.INTERVIEW, 0.9,
+                        "Initech wants a call.", "Initech", null));
+        when(classifier.classify(argThat(m -> m != null && m.id().equals("alert")), any()))
+                .thenReturn(new EmailClassification(null, EmailCategory.NOT_JOB_RELATED, 0.9,
+                        "A job alert.", "Hooli", "Product Manager"));
+        when(summaryWriter.write(any(), any(), anyInt(), any())).thenReturn("Initech added and wants a call.");
+
+        syncService.syncNow(userId);
+
+        // One application, added from the inbox, moved on by the later email; the job alert added nothing.
+        getJson("/api/applications", token)
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].company.name").value("Initech"))
+                .andExpect(jsonPath("$.content[0].jobTitle").value("Data Analyst"))
+                .andExpect(jsonPath("$.content[0].status").value("INTERVIEW"))
+                .andExpect(jsonPath("$.content[0].applicationDate").value("2026-09-20"));
+        getJson("/api/gmail/report", token)
+                .andExpect(jsonPath("$.lastCheck.emailsAnalyzed").value(3))
+                .andExpect(jsonPath("$.lastCheck.changes.length()").value(2))
+                .andExpect(jsonPath("$.lastCheck.changes[0].from").doesNotExist())
+                .andExpect(jsonPath("$.lastCheck.changes[0].to").value("APPLIED"))
+                .andExpect(jsonPath("$.lastCheck.changes[1].from").value("APPLIED"))
+                .andExpect(jsonPath("$.lastCheck.changes[1].to").value("INTERVIEW"));
     }
 
     @Test

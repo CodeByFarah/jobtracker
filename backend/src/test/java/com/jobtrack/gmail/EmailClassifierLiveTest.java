@@ -104,4 +104,41 @@ class EmailClassifierLiveTest {
         assertThat(result.category()).isEqualTo(expectedCategory);
         assertThat(result.applicationId()).isEqualTo(expectedApplication);
     }
+
+    static Stream<Arguments> untrackedEmails() {
+        return Stream.of(
+                Arguments.of("LinkedIn 'application sent'",
+                        "LinkedIn <jobs-noreply@linkedin.com>", "Sam, your application was sent to Hooli",
+                        "Your application was sent to Hooli. Senior Frontend Developer · Hooli · Istanbul (Hybrid). "
+                                + "Applied on October 14. Good luck!",
+                        EmailCategory.APPLICATION_RECEIVED, "hooli", "frontend"),
+                Arguments.of("Rejection through Workday",
+                        "Wonka Industries <wonka@myworkday.com>", "Your application status",
+                        "Dear Sam, thank you for applying for the QA Engineer position at Wonka Industries. After "
+                                + "reviewing your application, we have decided not to move forward at this time.",
+                        EmailCategory.REJECTED, "wonka", "qa"),
+                Arguments.of("Turkish interview invite",
+                        "Trendyol İK <ik@trendyol.com>", "Mülakat Daveti - Backend Developer",
+                        "Merhaba Sam, Backend Developer pozisyonu için yaptığınız başvuru değerlendirilmiştir. Sizi "
+                                + "22 Ekim Çarşamba saat 14:00'te online bir görüşmeye davet etmek isteriz.",
+                        EmailCategory.INTERVIEW, "trendyol", "backend"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("untrackedEmails")
+    void namesTheCompanyAndJobOfUntrackedApplications(String name, String from, String subject, String body,
+                                                      EmailCategory expectedCategory, String companyPart,
+                                                      String titlePart) {
+        long started = System.nanoTime();
+        EmailClassification result = classifier.classify(
+                new GmailMessage("m", from, subject, Instant.parse("2026-10-15T09:00:00Z"), body), List.of());
+        System.out.printf("[live] %-50s -> %-20s company=%s title=%s conf=%.2f %5.1fs  %s%n", name,
+                result.category(), result.companyName(), result.jobTitle(), result.confidence(),
+                (System.nanoTime() - started) / 1e9, result.summary());
+
+        assertThat(result.category()).isEqualTo(expectedCategory);
+        assertThat(result.companyName()).containsIgnoringCase(companyPart);
+        assertThat(result.jobTitle()).containsIgnoringCase(titlePart);
+        assertThat(result.confidence()).isGreaterThanOrEqualTo(EmailApplicationResolver.MIN_CONFIDENCE_TO_CREATE);
+    }
 }

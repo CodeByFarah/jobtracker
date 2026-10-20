@@ -177,7 +177,8 @@ export interface StatusChange {
   applicationId: number
   jobTitle: string
   companyName: string
-  from: ApplicationStatus
+  /** Null when the application was added from the email. */
+  from: ApplicationStatus | null
   to: ApplicationStatus
   emailSummary: string | null
 }

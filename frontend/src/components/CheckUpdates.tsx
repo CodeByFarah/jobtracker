@@ -224,7 +224,7 @@ function Report({ report, onNavigate }: { report: UpdateReport; onNavigate: () =
 
       {check && check.changes.length > 0 && (
         <section>
-          <h3 className="report-heading">Updated</h3>
+          <h3 className="report-heading">Updated and added</h3>
           <ul className="report-list">
             {check.changes.map((change) => (
               <li key={`${change.applicationId}-${change.to}`} className="report-item">
@@ -235,8 +235,14 @@ function Report({ report, onNavigate }: { report: UpdateReport; onNavigate: () =
                   {change.emailSummary && <p className="report-item-text">{change.emailSummary}</p>}
                 </div>
                 <span className="report-change">
-                  <span className="muted">{STATUS_LABELS[change.from]}</span>
-                  <span aria-label="changed to">→</span>
+                  {change.from ? (
+                    <>
+                      <span className="muted">{STATUS_LABELS[change.from]}</span>
+                      <span aria-label="changed to">→</span>
+                    </>
+                  ) : (
+                    <span className="badge badge-new">New</span>
+                  )}
                   <StatusBadge status={change.to} />
                 </span>
               </li>

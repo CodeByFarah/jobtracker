@@ -23,9 +23,12 @@ public class EmailClassifier {
 
     private static final String SYSTEM_PROMPT = """
             You help a job seeker keep track of their job applications by reading the emails they receive.
-            You decide which application an email is about and what it means. Be careful:
-            - Automatic job alerts, "jobs you may like", newsletters and marketing are NOT_JOB_RELATED,
-              even when they mention a company the person applied to.
+            You decide whether an email is about one of the person's own job applications, which company
+            and job it is about, and what it means. Emails can be in any language. Be careful:
+            - Automatic job alerts, "jobs you may like", recommended jobs, newsletters and marketing are
+              NOT_JOB_RELATED, even when they mention a company or a job.
+            - The company is the employer that is hiring, not the job board or recruiting software
+              (not LinkedIn, Indeed, Greenhouse, Workday, Lever, Kariyer.net and so on).
             - Only use REJECTED when the email clearly says the company will not move forward with this person.
             - Only use INTERVIEW when a real interview or call is being offered, scheduled or confirmed.
             Answer only with JSON.""";
@@ -37,7 +40,7 @@ public class EmailClassifier {
     }
 
     public EmailClassification classify(GmailMessage message, List<JobApplication> candidates) {
-        String applications = candidates.stream()
+        String applications = candidates.isEmpty() ? "(none of them match this email)" : candidates.stream()
                 .map(a -> "[" + a.getId() + "] " + a.getJobTitle() + " at " + a.getCompany().getName()
                         + " (current status: " + a.getStatus() + ")")
                 .collect(Collectors.joining("\n"));
@@ -59,8 +62,11 @@ public class EmailClassifier {
                 \"\"\"
 
                 Return:
-                - summary: one short sentence saying what this email tells the person
-                - applicationId: the number in [brackets] of the application this email is about, or 0 if none
+                - summary: one short sentence in English saying what this email tells the person
+                - applicationId: the number in [brackets] of the tracked application this email is about,
+                  or 0 if it is about none of them (for example an application they haven't tracked yet)
+                - company: the name of the hiring company this email is about, or "" if none
+                - jobTitle: the job title this email is about, or "" if it doesn't say
                 - category: one of
                   APPLICATION_RECEIVED (confirms the application was received or submitted),
                   INTERVIEW (invites to, schedules or confirms an interview or call),
@@ -68,7 +74,7 @@ public class EmailClassifier {
                   OFFER (makes a job offer),
                   REJECTED (they are not moving forward / position filled / not selected),
                   OTHER (about the application but none of the above),
-                  NOT_JOB_RELATED (job alert, newsletter, marketing, or not about these applications)
+                  NOT_JOB_RELATED (job alert, newsletter, marketing, or not about the person's own application)
                 - confidence: a number from 0 to 1
                 """.formatted(applications, message.from(), message.subject(),
                 DATE.format(message.receivedAt()), body);
@@ -102,7 +108,19 @@ public class EmailClassifier {
         if (summary.length() > 300) {
             summary = summary.substring(0, 300) + "…";
         }
-        return new EmailClassification(applicationId, category, confidence, summary.isEmpty() ? null : summary);
+        return new EmailClassification(applicationId, category, confidence, summary.isEmpty() ? null : summary,
+                text(answer, "company", 150), text(answer, "jobTitle", 150));
+    }
+
+    /** A short text field, or null when the model left it empty or wrote a placeholder. */
+    private static String text(JsonNode answer, String field, int max) {
+        String value = answer.path(field).asString("").strip();
+        String lower = value.toLowerCase(java.util.Locale.ROOT);
+        if (value.isEmpty() || lower.equals("unknown") || lower.equals("none") || lower.equals("n/a")
+                || lower.equals("null")) {
+            return null;
+        }
+        return value.length() > max ? value.substring(0, max).strip() : value;
     }
 
     private static Map<String, Object> schema() {
@@ -110,6 +128,8 @@ public class EmailClassifier {
         // Summary first: writing it down helps a small model before it commits to a category.
         properties.put("summary", Map.of("type", "string"));
         properties.put("applicationId", Map.of("type", "integer"));
+        properties.put("company", Map.of("type", "string"));
+        properties.put("jobTitle", Map.of("type", "string"));
         properties.put("category", Map.of("type", "string",
                 "enum", Arrays.stream(EmailCategory.values()).map(Enum::name).toList()));
         properties.put("confidence", Map.of("type", "number"));

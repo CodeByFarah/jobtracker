@@ -146,8 +146,11 @@ never go to a third-party AI service.
   missing. Nothing is saved until you check the values and click *Add application*.
 - **Gmail tracking.** Connect Gmail (read-only) from the prompt on the Dashboard or Applications
   page, or on the Profile page. Every 30 minutes, and whenever you click *Check for updates*, new
-  emails are fetched; those that mention the company of one of your open applications are read by
-  the AI, which decides what each one means:
+  emails are fetched (the first check covers the last 180 days). Every email that looks like hiring
+  mail is read by the AI: it comes from an applicant tracking system (Greenhouse, Lever, Workday, …),
+  uses application wording in English or Turkish, or names a company you track. The AI decides
+  what each one means, and which company and job it is about. If you never added that application,
+  JobTrack adds it for you (company, job title, and the email's date as the application date):
 
   | Email | Application moves to |
   |---|---|
@@ -159,7 +162,7 @@ never go to a third-party AI service.
   | Job alerts, newsletters, anything else | (no change) |
 
   Statuses only move forward along the normal workflow, and only when the model is at least 60%
-  confident. Every email the AI read is listed on its application with the AI's one-line summary and
+  confident (70% to add a new application; job alerts and newsletters never add one). Every email the AI read is listed on its application with the AI's one-line summary and
   the status change it made, so a wrong call is easy to spot and undo by hand.
 - **No reply.** An application still *Applied* or *Screening* with no news for 14 days gets a
   *No reply* badge.
@@ -227,7 +230,7 @@ No local database or configuration is needed.
 | Unit tests (JUnit 5 + Mockito) | Status transitions and history, application creation and update, validation rules, ownership (not-found for foreign ids), company creation, duplicate names and deletion rules, interview date rules, email status rules and the update summary, dashboard calculations (zero-filling, time zones), registration and login. |
 | Integration tests (`@SpringBootTest` + MockMvc + Testcontainers) | The full acceptance workflow (register → … → dashboard → search). User A vs. user B on every resource type. Page size, page number and filters combined with pagination. Sorting. Validation and error bodies. Transaction rollback when the history insert fails. |
 
-122 tests; all pass (plus the opt-in live AI test described under *AI features*).
+132 tests; all pass (plus the opt-in live AI test described under *AI features*).
 
 ## Setup
 

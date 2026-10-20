@@ -54,9 +54,11 @@ public class EmailSyncService {
     static final double MIN_CONFIDENCE_TO_UPDATE = 0.6;
     private static final Set<ApplicationStatus> OPEN = EnumSet.of(ApplicationStatus.SAVED, ApplicationStatus.APPLIED,
             ApplicationStatus.SCREENING, ApplicationStatus.INTERVIEW, ApplicationStatus.OFFER);
-    /** Skip mail that is never about an application. */
-    private static final String BASE_QUERY =
-            "-in:sent -in:drafts -in:chats -in:spam -in:trash -category:promotions -category:social";
+    /**
+     * Skip mail that is never about an application. Gmail's Promotions and Social tabs are searched
+     * too: LinkedIn and some careers sites land there.
+     */
+    private static final String BASE_QUERY = "-in:sent -in:drafts -in:chats -in:spam -in:trash";
 
     private final GmailConnectionRepository connectionRepository;
     private final EmailEventRepository eventRepository;
@@ -67,6 +69,7 @@ public class EmailSyncService {
     private final GmailApiClient gmail;
     private final EmailClassifier classifier;
     private final UpdateSummaryWriter summaryWriter;
+    private final EmailApplicationResolver resolver;
     private final GmailProperties properties;
     private final Clock clock;
 
@@ -84,7 +87,7 @@ public class EmailSyncService {
                             JobApplicationRepository applicationRepository, UserRepository userRepository,
                             ApplicationService applicationService, GmailConnectionService connectionService,
                             GmailApiClient gmail, EmailClassifier classifier, UpdateSummaryWriter summaryWriter,
-                            GmailProperties properties, Clock clock) {
+                            EmailApplicationResolver resolver, GmailProperties properties, Clock clock) {
         this.connectionRepository = connectionRepository;
         this.eventRepository = eventRepository;
         this.applicationRepository = applicationRepository;
@@ -94,6 +97,7 @@ public class EmailSyncService {
         this.gmail = gmail;
         this.classifier = classifier;
         this.summaryWriter = summaryWriter;
+        this.resolver = resolver;
         this.properties = properties;
         this.clock = clock;
     }
@@ -151,8 +155,11 @@ public class EmailSyncService {
         progress.put(userId, counter);
         try {
             String accessToken = connectionService.accessToken(connection);
-            List<String> ids = gmail.listMessageIds(accessToken, query(connection.getLastSyncedAt()),
-                    properties.maxMessagesPerSync());
+            List<String> trackedCompanies = applicationRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
+                    .map(a -> a.getCompany().getName())
+                    .toList();
+            List<String> ids = gmail.listMessageIds(accessToken,
+                    query(connection.getLastSyncedAt(), trackedCompanies), properties.maxMessagesPerSync());
             List<GmailMessage> messages = new ArrayList<>();
             for (String id : ids) {
                 if (!eventRepository.existsByUserIdAndGmailMessageId(userId, id)) {
@@ -168,7 +175,9 @@ public class EmailSyncService {
                 // Re-read every time: an earlier email in this run may have changed or closed an application.
                 List<JobApplication> open = applicationRepository.findByUserIdAndStatusIn(userId, OPEN);
                 List<JobApplication> candidates = CompanyMatcher.candidates(message, open);
-                if (!candidates.isEmpty()) {
+                // Mail about a tracked company is always read; anything else that looks like hiring
+                // mail is read too, so applications the user never added are found as well.
+                if (!candidates.isEmpty() || JobEmailFilter.looksJobRelated(message)) {
                     analyzed++;
                     EmailClassification classification = classifier.classify(message, candidates);
                     StatusChange change = record(userId, message, classification, candidates);
@@ -205,11 +214,20 @@ public class EmailSyncService {
                 .filter(a -> a.getId().equals(classification.applicationId()))
                 .findFirst()
                 .orElse(null);
+        boolean created = false;
+        if (application == null && classification.category() != EmailCategory.NOT_JOB_RELATED) {
+            // About an application the pre-filter didn't link: find it by company name, or add it.
+            Optional<EmailApplicationResolver.Resolved> resolved = resolver.resolve(userId, message, classification);
+            if (resolved.isPresent()) {
+                application = resolved.get().application();
+                created = resolved.get().created();
+            }
+        }
 
-        ApplicationStatus before = application == null ? null : application.getStatus();
-        ApplicationStatus after = before;
+        ApplicationStatus before = application == null || created ? null : application.getStatus();
+        ApplicationStatus after = application == null ? null : application.getStatus();
         if (application != null && classification.confidence() >= MIN_CONFIDENCE_TO_UPDATE) {
-            for (ApplicationStatus step : EmailStatusRules.steps(before, classification.category())) {
+            for (ApplicationStatus step : EmailStatusRules.steps(after, classification.category())) {
                 try {
                     applicationService.changeStatus(userId, application.getId(), step);
                     after = step;
@@ -253,12 +271,15 @@ public class EmailSyncService {
         });
     }
 
-    /** Gmail search for mail since the last complete sync (with an hour of overlap), or the last N days. */
-    String query(Instant lastSyncedAt) {
-        if (lastSyncedAt == null) {
-            return BASE_QUERY + " newer_than:" + properties.initialSyncDays() + "d";
-        }
-        return BASE_QUERY + " after:" + lastSyncedAt.minus(Duration.ofHours(1)).getEpochSecond();
+    /**
+     * Gmail search for likely job mail (hiring senders, application wording, or a tracked company's
+     * name) since the last complete sync (with an hour of overlap), or over the last N days.
+     */
+    String query(Instant lastSyncedAt, List<String> trackedCompanies) {
+        String since = lastSyncedAt == null
+                ? "newer_than:" + properties.initialSyncDays() + "d"
+                : "after:" + lastSyncedAt.minus(Duration.ofHours(1)).getEpochSecond();
+        return BASE_QUERY + " " + since + " " + JobEmailFilter.searchClause(trackedCompanies);
     }
 
     private static String limit(String value, int max) {

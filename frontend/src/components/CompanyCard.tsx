@@ -8,7 +8,7 @@ export function CompanyCard({ company }: { company: Company }) {
   return (
     <Link to={`/companies/${company.id}`} className="card company-card">
       <div className="company-card-head">
-        <CompanyLogo companyId={company.id} name={company.name} logoUpdatedAt={company.logoUpdatedAt} />
+        <CompanyLogo companyId={company.id} name={company.name} logoUpdatedAt={company.logoUpdatedAt} size="small" />
         <div>
           <h3>{company.name}</h3>
           {company.industry && <p className="muted">{company.industry}</p>}
@@ -17,11 +17,11 @@ export function CompanyCard({ company }: { company: Company }) {
       <div className="company-card-meta">
         {company.location && (
           <span>
-            <Icon name="mapPin" size={15} /> {company.location}
+            <Icon name="mapPin" size={13} /> {company.location}
           </span>
         )}
         <span>
-          <Icon name="briefcase" size={15} /> {pluralize(company.applicationCount, 'application')}
+          <Icon name="briefcase" size={13} /> {pluralize(company.applicationCount, 'application')}
         </span>
       </div>
     </Link>

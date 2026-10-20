@@ -671,6 +671,9 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 .updates-working { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 28px 8px 12px; }
 .updates-working-title { font-family: var(--font-display); font-size: 21px; font-weight: 600; letter-spacing: -0.015em; }
 .updates-working-note { max-width: 420px; font-size: 14px; }
+.empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.import-intro { font-size: 15px; }
+.modal-footer .import-manual { margin-right: auto; padding-left: 0; }
 .connect-waiting-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
 
 /* Shown inside the Google sign-in popup once it comes back to JobTrack. */

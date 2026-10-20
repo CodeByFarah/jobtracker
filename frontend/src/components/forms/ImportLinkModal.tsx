@@ -9,10 +9,12 @@ interface ImportLinkModalProps {
   onClose: () => void
   /** Called with the details read from the page; the caller opens the application form with them. */
   onImported: (preview: JobLinkPreview) => void
+  /** Switches to the empty form, for when there's no link or the page can't be read. */
+  onManual?: () => void
 }
 
 /** Step 1 of "Add from link": paste a posting URL and let the local AI read it. */
-export function ImportLinkModal({ onClose, onImported }: ImportLinkModalProps) {
+export function ImportLinkModal({ onClose, onImported, onManual }: ImportLinkModalProps) {
   const [url, setUrl] = useState('')
   const { submitting, formError, fieldErrors, run } = useSubmit()
 
@@ -30,6 +32,11 @@ export function ImportLinkModal({ onClose, onImported }: ImportLinkModalProps) {
       onClose={onClose}
       footer={
         <>
+          {onManual && (
+            <button type="button" className="button button-ghost import-manual" onClick={onManual} disabled={submitting}>
+              Enter details by hand
+            </button>
+          )}
           <button type="button" className="button button-secondary" onClick={onClose}>
             Cancel
           </button>
@@ -40,6 +47,10 @@ export function ImportLinkModal({ onClose, onImported }: ImportLinkModalProps) {
       }
     >
       <form id="import-link-form" className="form" onSubmit={submit} noValidate>
+        <p className="muted import-intro">
+          Paste the link to the job posting. Your local AI reads it and fills in the title, company, location and
+          salary for you to check.
+        </p>
         {formError && !fieldErrors.url && <p className="form-error" role="alert">{formError}</p>}
         <FormField
           label="Job posting link"
@@ -53,6 +64,7 @@ export function ImportLinkModal({ onClose, onImported }: ImportLinkModalProps) {
             placeholder="https://"
             maxLength={500}
             disabled={submitting}
+            autoFocus
             required
           />
         </FormField>

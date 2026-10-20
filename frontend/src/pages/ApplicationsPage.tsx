@@ -1,21 +1,20 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { ApplicationCard, ApplicationListHeader } from '../components/ApplicationCard'
 import { CheckUpdatesButton } from '../components/CheckUpdates'
 import { FilterPanel } from '../components/FilterPanel'
 import { GmailPrompt } from '../components/GmailPrompt'
 import { DEFAULT_FILTERS, type ApplicationFilters } from '../utils/filters'
-import { ApplicationFormModal } from '../components/forms/ApplicationFormModal'
-import { ImportLinkModal } from '../components/forms/ImportLinkModal'
 import { Icon } from '../components/Icon'
 import { Pagination } from '../components/Pagination'
 import { SearchBar } from '../components/SearchBar'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
+import { useAddApplication } from '../hooks/useAddApplication'
 import { useAsync } from '../hooks/useAsync'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { applicationApi, type ApplicationSort } from '../services/api'
-import type { ApplicationStatus, EmploymentType, JobLinkPreview } from '../types/api'
+import type { ApplicationStatus, EmploymentType } from '../types/api'
 
 const PAGE_SIZE = 10
 
@@ -25,11 +24,8 @@ const PAGE_SIZE = 10
  */
 export function ApplicationsPage() {
   useDocumentTitle('Applications')
-  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const [creating, setCreating] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [prefill, setPrefill] = useState<JobLinkPreview | undefined>(undefined)
+  const add = useAddApplication()
 
   const filters: ApplicationFilters = {
     status: (params.get('status') ?? '') as ApplicationStatus | '',
@@ -97,11 +93,11 @@ export function ApplicationsPage() {
         </div>
         <div className="header-actions">
           <CheckUpdatesButton className="button button-secondary" onUpdated={results.reload} />
-          <button type="button" className="button button-secondary" onClick={() => setImporting(true)}>
-            <Icon name="link" /> Add from link
+          <button type="button" className="button button-secondary" onClick={add.manually}>
+            <Icon name="plus" /> Add manually
           </button>
-          <button type="button" className="button button-primary" onClick={() => setCreating(true)}>
-            <Icon name="plus" /> New application
+          <button type="button" className="button button-primary" onClick={add.fromLink}>
+            <Icon name="link" /> Add from link
           </button>
         </div>
       </header>
@@ -123,11 +119,16 @@ export function ApplicationsPage() {
           <EmptyState
             icon="briefcase"
             title="No applications yet"
-            text="Add the jobs you’ve applied for or want to apply for."
+            text="Paste a job link and your local AI fills in the details, or connect Gmail and they’re found for you."
             action={
-              <button type="button" className="button button-primary" onClick={() => setCreating(true)}>
-                <Icon name="plus" /> Add application
-              </button>
+              <div className="empty-actions">
+                <button type="button" className="button button-primary" onClick={add.fromLink}>
+                  <Icon name="link" /> Add from link
+                </button>
+                <button type="button" className="button button-secondary" onClick={add.manually}>
+                  Add manually
+                </button>
+              </div>
             }
           />
         )
@@ -149,27 +150,7 @@ export function ApplicationsPage() {
         </div>
       )}
 
-      {importing && (
-        <ImportLinkModal
-          onClose={() => setImporting(false)}
-          onImported={(preview) => {
-            setImporting(false)
-            setPrefill(preview)
-            setCreating(true)
-          }}
-        />
-      )}
-
-      {creating && (
-        <ApplicationFormModal
-          prefill={prefill}
-          onClose={() => {
-            setCreating(false)
-            setPrefill(undefined)
-          }}
-          onSaved={(application) => navigate(`/applications/${application.id}`)}
-        />
-      )}
+      {add.dialogs}
     </>
   )
 }

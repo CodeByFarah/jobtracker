@@ -1,15 +1,14 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ApplicationsOverTimeChart } from '../components/charts/ApplicationsOverTimeChart'
 import { StatusBreakdownChart } from '../components/charts/StatusBreakdownChart'
 import { CheckUpdatesButton } from '../components/CheckUpdates'
 import { EmailEventList } from '../components/EmailEventList'
-import { ApplicationFormModal } from '../components/forms/ApplicationFormModal'
 import { GmailPrompt } from '../components/GmailPrompt'
 import { Icon } from '../components/Icon'
 import { InterviewCard } from '../components/InterviewCard'
 import { StatCard } from '../components/StatCard'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
+import { useAddApplication } from '../hooks/useAddApplication'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../hooks/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -18,11 +17,10 @@ import { dashboardApi, gmailApi } from '../services/api'
 export function DashboardPage() {
   useDocumentTitle('Dashboard')
   const { user } = useAuth()
-  const navigate = useNavigate()
+  const add = useAddApplication()
   const dashboard = useAsync(() => dashboardApi.get(), [])
   const gmail = useAsync(() => gmailApi.status(), [])
   const inbox = useAsync(() => gmailApi.events(5), [])
-  const [creating, setCreating] = useState(false)
 
   const firstName = user?.fullName.split(' ')[0]
   const d = dashboard.data
@@ -42,10 +40,13 @@ export function DashboardPage() {
           <p className="muted">Here’s where your job search stands.</p>
         </div>
         <div className="header-actions">
-          <button type="button" className="button button-secondary" onClick={() => setCreating(true)}>
-            <Icon name="plus" /> New application
+          <CheckUpdatesButton className="button button-secondary" onUpdated={reloadAll} />
+          <button type="button" className="button button-secondary" onClick={add.manually}>
+            <Icon name="plus" /> Add manually
           </button>
-          <CheckUpdatesButton onUpdated={reloadAll} />
+          <button type="button" className="button button-primary" onClick={add.fromLink}>
+            <Icon name="link" /> Add from link
+          </button>
         </div>
       </header>
 
@@ -58,11 +59,16 @@ export function DashboardPage() {
         <EmptyState
           icon="briefcase"
           title="Your dashboard fills in as you go"
-          text="Add the first job you’ve applied for (or want to). Statistics, charts and email updates will appear here."
+          text="Paste the link to a job you’ve applied for (or want to) and your local AI fills in the details. Statistics, charts and email updates will appear here."
           action={
-            <button type="button" className="button button-primary" onClick={() => setCreating(true)}>
-              <Icon name="plus" /> Add your first application
-            </button>
+            <div className="empty-actions">
+              <button type="button" className="button button-primary" onClick={add.fromLink}>
+                <Icon name="link" /> Add from link
+              </button>
+              <button type="button" className="button button-secondary" onClick={add.manually}>
+                Add manually
+              </button>
+            </div>
           }
         />
       )}
@@ -127,12 +133,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      {creating && (
-        <ApplicationFormModal
-          onClose={() => setCreating(false)}
-          onSaved={(application) => navigate(`/applications/${application.id}`)}
-        />
-      )}
+      {add.dialogs}
     </>
   )
 }

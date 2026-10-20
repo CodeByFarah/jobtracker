@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApplicationCard, ApplicationListHeader } from '../components/ApplicationCard'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { ApplicationFormModal } from '../components/forms/ApplicationFormModal'
 import { CompanyFormModal } from '../components/forms/CompanyFormModal'
 import { Icon } from '../components/Icon'
 import { Modal } from '../components/Modal'
 import { EmptyState, ErrorState, LoadingState } from '../components/States'
+import { useAddApplication } from '../hooks/useAddApplication'
 import { useAsync } from '../hooks/useAsync'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { companyApi } from '../services/api'
@@ -16,7 +16,8 @@ export function CompanyDetailPage() {
   const navigate = useNavigate()
   const company = useAsync(() => companyApi.get(id), [id])
   const applications = useAsync(() => companyApi.applications(id), [id])
-  const [dialog, setDialog] = useState<'edit' | 'delete' | 'application' | null>(null)
+  const [dialog, setDialog] = useState<'edit' | 'delete' | null>(null)
+  const add = useAddApplication()
   useDocumentTitle(company.data?.name ?? 'Company')
 
   const back = (
@@ -64,8 +65,8 @@ export function CompanyDetailPage() {
           <section className="card">
             <header className="section-header">
               <h2>Applications</h2>
-              <button type="button" className="button button-secondary button-small" onClick={() => setDialog('application')}>
-                <Icon name="plus" size={16} /> Add application
+              <button type="button" className="button button-secondary button-small" onClick={add.fromLink}>
+                <Icon name="link" size={16} /> Add from link
               </button>
             </header>
             {applications.error && <ErrorState error={applications.error} onRetry={applications.reload} />}
@@ -149,13 +150,7 @@ export function CompanyDetailPage() {
           onClose={() => setDialog(null)}
         />
       )}
-      {dialog === 'application' && (
-        <ApplicationFormModal
-          defaultCompanyId={c.id}
-          onClose={() => setDialog(null)}
-          onSaved={(a) => navigate(`/applications/${a.id}`)}
-        />
-      )}
+      {add.dialogs}
     </>
   )
 }

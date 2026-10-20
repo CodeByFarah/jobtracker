@@ -93,9 +93,6 @@ export function ApplicationsPage() {
         </div>
         <div className="header-actions">
           <CheckUpdatesButton className="button button-secondary" onUpdated={results.reload} />
-          <button type="button" className="button button-secondary" onClick={add.manually}>
-            <Icon name="plus" /> Add manually
-          </button>
           <button type="button" className="button button-primary" onClick={add.fromLink}>
             <Icon name="link" /> Add from link
           </button>
@@ -121,14 +118,9 @@ export function ApplicationsPage() {
             title="No applications yet"
             text="Paste a job link and your local AI fills in the details, or connect Gmail and they’re found for you."
             action={
-              <div className="empty-actions">
-                <button type="button" className="button button-primary" onClick={add.fromLink}>
-                  <Icon name="link" /> Add from link
-                </button>
-                <button type="button" className="button button-secondary" onClick={add.manually}>
-                  Add manually
-                </button>
-              </div>
+              <button type="button" className="button button-primary" onClick={add.fromLink}>
+                <Icon name="link" /> Add from link
+              </button>
             }
           />
         )

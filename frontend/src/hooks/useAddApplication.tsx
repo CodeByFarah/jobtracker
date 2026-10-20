@@ -4,46 +4,36 @@ import { ApplicationFormModal } from '../components/forms/ApplicationFormModal'
 import { ImportLinkModal } from '../components/forms/ImportLinkModal'
 import type { JobLinkPreview } from '../types/api'
 
-type Step = 'closed' | 'link' | 'form'
-
 /**
- * Adding an application, the same way on every page: paste a job link and the local AI fills the
- * form in, or type it in by hand. Render `dialogs` once; call `fromLink` / `manually` from buttons.
+ * Adding an application, the same way on every page: paste a job link, the local AI reads the
+ * posting, and the user checks the filled-in details before saving. Render `dialogs` once and
+ * call `fromLink` from a button.
  */
 export function useAddApplication() {
   const navigate = useNavigate()
-  const [step, setStep] = useState<Step>('closed')
-  const [prefill, setPrefill] = useState<JobLinkPreview | undefined>(undefined)
-
-  function manually() {
-    setPrefill(undefined)
-    setStep('form')
-  }
+  const [prefill, setPrefill] = useState<JobLinkPreview | null>(null)
+  const [pasting, setPasting] = useState(false)
 
   const dialogs = (
     <>
-      {step === 'link' && (
+      {pasting && (
         <ImportLinkModal
-          onClose={() => setStep('closed')}
-          onManual={manually}
+          onClose={() => setPasting(false)}
           onImported={(preview) => {
+            setPasting(false)
             setPrefill(preview)
-            setStep('form')
           }}
         />
       )}
-      {step === 'form' && (
+      {prefill && (
         <ApplicationFormModal
           prefill={prefill}
-          onClose={() => {
-            setStep('closed')
-            setPrefill(undefined)
-          }}
+          onClose={() => setPrefill(null)}
           onSaved={(application) => navigate(`/applications/${application.id}`)}
         />
       )}
     </>
   )
 
-  return { fromLink: () => setStep('link'), manually, dialogs }
+  return { fromLink: () => setPasting(true), dialogs }
 }

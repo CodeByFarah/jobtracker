@@ -9,12 +9,10 @@ interface ImportLinkModalProps {
   onClose: () => void
   /** Called with the details read from the page; the caller opens the application form with them. */
   onImported: (preview: JobLinkPreview) => void
-  /** Switches to the empty form, for when there's no link or the page can't be read. */
-  onManual?: () => void
 }
 
 /** Step 1 of "Add from link": paste a posting URL and let the local AI read it. */
-export function ImportLinkModal({ onClose, onImported, onManual }: ImportLinkModalProps) {
+export function ImportLinkModal({ onClose, onImported }: ImportLinkModalProps) {
   const [url, setUrl] = useState('')
   const { submitting, formError, fieldErrors, run } = useSubmit()
 
@@ -32,11 +30,6 @@ export function ImportLinkModal({ onClose, onImported, onManual }: ImportLinkMod
       onClose={onClose}
       footer={
         <>
-          {onManual && (
-            <button type="button" className="button button-ghost import-manual" onClick={onManual} disabled={submitting}>
-              Enter details by hand
-            </button>
-          )}
           <button type="button" className="button button-secondary" onClick={onClose}>
             Cancel
           </button>

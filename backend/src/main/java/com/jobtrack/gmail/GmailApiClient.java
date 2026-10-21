@@ -22,7 +22,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Minimal client for Google's OAuth endpoints and the Gmail REST API (read-only scope), using
@@ -107,19 +109,31 @@ public class GmailApiClient {
         List<String> ids = new ArrayList<>();
         String pageToken = null;
         do {
-            UriComponentsBuilder uri = UriComponentsBuilder.fromUriString(API_URL + "/messages")
-                    .queryParam("q", query)
-                    .queryParam("maxResults", Math.min(100, max - ids.size()));
-            if (pageToken != null) {
-                uri.queryParam("pageToken", pageToken);
-            }
-            JsonNode page = get(accessToken, uri.encode().build().toUri());
+            JsonNode page = get(accessToken, messagesUri(query, Math.min(100, max - ids.size()), pageToken));
             for (JsonNode message : page.path("messages")) {
                 ids.add(message.path("id").asString(""));
             }
             pageToken = page.path("nextPageToken").asString(null);
         } while (pageToken != null && ids.size() < max);
         return ids;
+    }
+
+    /**
+     * The message-list URL. The search goes in as a URI variable so every character is encoded:
+     * written straight into the template, Gmail's {a b c} "any of" syntax would be taken for a
+     * template placeholder and break the URL.
+     */
+    static URI messagesUri(String query, int maxResults, String pageToken) {
+        UriComponentsBuilder uri = UriComponentsBuilder.fromUriString(API_URL + "/messages")
+                .queryParam("q", "{q}")
+                .queryParam("maxResults", maxResults);
+        Map<String, Object> values = new HashMap<>();
+        values.put("q", query);
+        if (pageToken != null) {
+            uri.queryParam("pageToken", "{pageToken}");
+            values.put("pageToken", pageToken);
+        }
+        return uri.encode().buildAndExpand(values).toUri();
     }
 
     public GmailMessage getMessage(String accessToken, String id) {

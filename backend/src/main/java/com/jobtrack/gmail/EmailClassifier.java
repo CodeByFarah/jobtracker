@@ -29,6 +29,8 @@ public class EmailClassifier {
               NOT_JOB_RELATED, even when they mention a company or a job.
             - The company is the employer that is hiring, not the job board or recruiting software
               (not LinkedIn, Indeed, Greenhouse, Workday, Lever, Kariyer.net and so on).
+            - Careers-site account emails (create or verify your candidate account, sign-in codes,
+              password resets) are OTHER: they don't say anything about an application.
             - Only use REJECTED when the email clearly says the company will not move forward with this person.
             - Only use INTERVIEW when a real interview or call is being offered, scheduled or confirmed.
             Answer only with JSON.""";

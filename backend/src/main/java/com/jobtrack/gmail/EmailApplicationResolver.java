@@ -74,7 +74,7 @@ public class EmailApplicationResolver {
                 .toList();
         Optional<JobApplication> existing = pick(atCompany, reading.jobTitle());
         if (existing.isPresent()) {
-            return Optional.of(new Resolved(existing.get(), false));
+            return Optional.of(new Resolved(fillIn(existing.get(), message, reading), false));
         }
         return Optional.of(new Resolved(create(userId, message, reading), true));
     }
@@ -100,6 +100,30 @@ public class EmailApplicationResolver {
         }
         // An application added earlier from an email that didn't name the job is this one.
         return atCompany.stream().filter(a -> UNKNOWN_TITLE.equals(a.getJobTitle())).findFirst();
+    }
+
+    /**
+     * Emails are read newest first, so an application added from a recent email can learn from an
+     * older one: the job title it didn't know, and the earlier date the person actually applied.
+     */
+    private JobApplication fillIn(JobApplication application, GmailMessage message, EmailClassification reading) {
+        boolean changed = false;
+        if (UNKNOWN_TITLE.equals(application.getJobTitle()) && reading.jobTitle() != null) {
+            application.setJobTitle(reading.jobTitle());
+            changed = true;
+        }
+        LocalDate emailDate = LocalDate.ofInstant(message.receivedAt(), ZoneOffset.UTC);
+        String notes = application.getNotes();
+        boolean addedFromEmail = notes != null && notes.startsWith("Added automatically from an email");
+        if (addedFromEmail && application.getApplicationDate() != null
+                && emailDate.isBefore(application.getApplicationDate())) {
+            application.setApplicationDate(emailDate);
+            changed = true;
+        }
+        if (changed) {
+            applicationRepository.save(application);
+        }
+        return application; // keeps its loaded company; the saved copy may not have it
     }
 
     private static boolean similarTitles(String a, String b) {

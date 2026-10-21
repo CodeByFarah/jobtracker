@@ -55,10 +55,11 @@ public class EmailSyncService {
     private static final Set<ApplicationStatus> OPEN = EnumSet.of(ApplicationStatus.SAVED, ApplicationStatus.APPLIED,
             ApplicationStatus.SCREENING, ApplicationStatus.INTERVIEW, ApplicationStatus.OFFER);
     /**
-     * Skip mail that is never about an application. Gmail's Promotions and Social tabs are searched
-     * too: LinkedIn and some careers sites land there.
+     * Skip mail that is never about an application. The Promotions tab is skipped (courses, offers,
+     * job alerts); the Social tab is searched because LinkedIn application updates can land there.
      */
-    private static final String BASE_QUERY = "-in:sent -in:drafts -in:chats -in:spam -in:trash";
+    private static final String BASE_QUERY =
+            "-in:sent -in:drafts -in:chats -in:spam -in:trash -category:promotions";
 
     private final GmailConnectionRepository connectionRepository;
     private final EmailEventRepository eventRepository;
@@ -166,8 +167,10 @@ public class EmailSyncService {
                     messages.add(gmail.getMessage(accessToken, id));
                 }
             }
-            // Oldest first, so an application moves through its statuses in the order things happened.
-            messages.sort(Comparator.comparing(GmailMessage::receivedAt));
+            // Newest first, so the latest news shows up straight away even when a first check has
+            // months of mail to read. Statuses only ever move forward (EmailStatusRules), so an older
+            // email read afterwards can't undo a newer one.
+            messages.sort(Comparator.comparing(GmailMessage::receivedAt).reversed());
             counter[1] = messages.size();
 
             for (GmailMessage message : messages) {
@@ -194,6 +197,10 @@ public class EmailSyncService {
         } catch (RestClientException e) {
             log.warn("Gmail sync for user {} failed: {}", userId, e.getMessage());
             error = "Couldn't reach Gmail: " + e.getMessage();
+        } catch (RuntimeException e) {
+            // Anything else must still end the check with a visible error, never a silent "no new emails".
+            log.error("Gmail sync for user {} failed unexpectedly", userId, e);
+            error = "The check stopped because of an unexpected error. Please try again.";
         } finally {
             progress.remove(userId);
         }

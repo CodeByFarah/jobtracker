@@ -100,7 +100,7 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
         getJson("/api/gmail/report", token)
                 .andExpect(jsonPath("$.lastCheck.overview").value("Acme said no; Globex wants to talk."))
                 .andExpect(jsonPath("$.lastCheck.changes.length()").value(2))
-                .andExpect(jsonPath("$.lastCheck.changes[0].to").value("REJECTED"))
+                .andExpect(jsonPath("$.lastCheck.changes[*].to").value(org.hamcrest.Matchers.contains("INTERVIEW", "REJECTED"))) // newest email first
                 .andExpect(jsonPath("$.applications.length()").value(2))
                 .andExpect(jsonPath("$.applications[0].changedInLastCheck").value(true))
                 .andExpect(jsonPath("$.applications[?(@.companyName == 'Globex')].lastEmailSummary").value(org.hamcrest.Matchers.contains("Globex wants a call.")));
@@ -135,7 +135,8 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
         when(classifier.classify(argThat(m -> m != null && m.id().equals("received")), any()))
                 .thenReturn(new EmailClassification(null, EmailCategory.APPLICATION_RECEIVED, 0.95,
                         "Your Initech application was sent.", "Initech", "Data Analyst"));
-        // The second email doesn't name the job; it still belongs to the Initech application.
+        // Emails are read newest first: the invite doesn't name the job, so the application starts
+        // without a title; the older confirmation then fills in the title and the real apply date.
         when(classifier.classify(argThat(m -> m != null && m.id().equals("interview")), any()))
                 .thenReturn(new EmailClassification(null, EmailCategory.INTERVIEW, 0.9,
                         "Initech wants a call.", "Initech", null));
@@ -155,11 +156,9 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.content[0].applicationDate").value("2026-09-20"));
         getJson("/api/gmail/report", token)
                 .andExpect(jsonPath("$.lastCheck.emailsAnalyzed").value(3))
-                .andExpect(jsonPath("$.lastCheck.changes.length()").value(2))
+                .andExpect(jsonPath("$.lastCheck.changes.length()").value(1))
                 .andExpect(jsonPath("$.lastCheck.changes[0].from").doesNotExist())
-                .andExpect(jsonPath("$.lastCheck.changes[0].to").value("APPLIED"))
-                .andExpect(jsonPath("$.lastCheck.changes[1].from").value("APPLIED"))
-                .andExpect(jsonPath("$.lastCheck.changes[1].to").value("INTERVIEW"));
+                .andExpect(jsonPath("$.lastCheck.changes[0].to").value("INTERVIEW"));
     }
 
     @Test

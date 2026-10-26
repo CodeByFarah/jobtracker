@@ -212,6 +212,7 @@ code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-si
 .card > h2 { margin-bottom: 18px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .section-header a { font-size: 15px; }
+.section-header-meta { display: inline-flex; align-items: baseline; gap: 14px; flex-wrap: wrap; justify-content: flex-end; font-size: 14px; }
 .stack { display: grid; gap: 12px; }
 .card.stack { gap: 0; padding: 6px 28px; }
 .card.stack > * + * { border-top: 1px solid var(--border); }
@@ -400,7 +401,10 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 .company-card-head { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .company-card .company-card-head { gap: 12px; }
 .company-card .company-card-head > div { min-width: 0; }
-.company-card h3 { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.company-card h3 {
+  font-size: 16px; line-height: 1.25; overflow: hidden; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+}
 .company-card .muted { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .company-card .company-card-meta { font-size: 13px; gap: 4px 12px; }
 /* Company logos: the real logo on a white tile (logos are drawn for light backgrounds), or the
@@ -426,6 +430,15 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 .company-logo-tint-teal { --logo-hue: #0f9b9b; }
 .company-logo-tint-indigo { --logo-hue: #5e5ce6; }
 .app-row-lead { display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* Column heading lines up with the job titles, not the logos (34px logo + 14px gap). */
+.app-row-header-lead { padding-left: 48px; }
+/* Page headers with a logo: the logo sits beside the first line of a title that may wrap. */
+.detail-header .company-card-head { align-items: flex-start; gap: 18px; }
+.detail-header .company-card-head > div { min-width: 0; }
+@media (max-width: 560px) {
+  .detail-header .company-logo-large { width: 48px; height: 48px; border-radius: 12px; font-size: 20px; }
+  .detail-header .company-card-head { gap: 14px; }
+}
 .company-card-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--text-3); }
 .company-card-meta span { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -487,13 +500,13 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 @media (max-width: 1100px) { .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
 .stat-card {
-  display: grid; align-content: start; gap: 4px; padding: 22px; color: var(--text); text-decoration: none !important;
+  display: grid; align-content: start; gap: 2px; padding: 18px 20px; color: var(--text); text-decoration: none !important;
   transition: box-shadow 0.3s var(--ease), transform 0.3s var(--ease);
 }
 .stat-card-link:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
 .stat-label { font-size: 13px; font-weight: 500; color: var(--text-3); }
 .stat-value {
-  font-family: var(--font-display); font-size: 40px; line-height: 1.1; font-weight: 600;
+  font-family: var(--font-display); font-size: 34px; line-height: 1.15; font-weight: 600;
   letter-spacing: -0.03em; font-variant-numeric: tabular-nums;
 }
 .stat-detail { font-size: 13px; color: var(--text-3); }
@@ -506,10 +519,14 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 .viz-tip {
   position: absolute; z-index: 5; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
   padding: 6px 10px; border-radius: 10px; background: var(--text); color: var(--surface);
-  font-size: 13px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s;
-  box-shadow: var(--shadow-lg);
+  font-size: 13px; white-space: nowrap; pointer-events: none; box-shadow: var(--shadow-lg);
+  /* Out of the layout until shown, so a hidden tip can never make the page scroll sideways. */
+  display: none;
 }
 .viz-tip strong { font-weight: 600; margin-right: 4px; }
+/* Tips on the outer columns open inwards. */
+.col-chart-slot:first-child .viz-tip { left: 0; transform: none; }
+.col-chart-slot:last-child .viz-tip { left: auto; right: 0; transform: none; }
 
 .hbar-chart { display: grid; gap: 6px; }
 .hbar-row {
@@ -521,7 +538,7 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 .hbar-track { position: relative; display: flex; align-items: center; gap: 8px; height: 14px; padding-right: 32px; }
 .hbar-bar { height: 14px; min-width: 4px; background: var(--series-1); border-radius: 7px; }
 .hbar-value { font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-.hbar-row:hover .viz-tip, .hbar-row:focus-visible .viz-tip { opacity: 1; }
+.hbar-row:hover .viz-tip, .hbar-row:focus-visible .viz-tip { display: block; }
 .hbar-track .viz-tip { left: 0; transform: none; }
 
 .col-chart-plot { position: relative; height: 220px; padding-left: 28px; }
@@ -542,7 +559,7 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 }
 .col-chart-label { height: 24px; padding-top: 6px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
 .col-chart-slot:hover .col-chart-bar-area, .col-chart-slot:focus-visible .col-chart-bar-area { background: color-mix(in srgb, var(--surface-2) 80%, transparent); }
-.col-chart-slot:hover .viz-tip, .col-chart-slot:focus-visible .viz-tip { opacity: 1; }
+.col-chart-slot:hover .viz-tip, .col-chart-slot:focus-visible .viz-tip { display: block; }
 .col-chart-bar-area .viz-tip { bottom: auto; top: 4px; }
 
 .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -660,7 +677,12 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 /* ---------- Check for updates ---------- */
 .stat-grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 @media (max-width: 1000px) { .stat-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .stat-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .stat-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-grid-5 > :last-child { grid-column: 1 / -1; }
+  .stat-card { padding: 16px; }
+  .stat-value { font-size: 30px; }
+}
 .button-large { min-height: 46px; padding: 0 26px; font-size: 17px; }
 .spinner-large { width: 34px; height: 34px; border-width: 3px; }
 

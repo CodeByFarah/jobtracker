@@ -46,7 +46,7 @@ export function ApplicationCard({ application, showCompany = true }: { applicati
 export function ApplicationListHeader({ showCompany = true }: { showCompany?: boolean }) {
   return (
     <div className="app-row app-row-header" aria-hidden="true">
-      <span>{showCompany ? 'Position / company' : 'Position'}</span>
+      <span className={showCompany ? 'app-row-header-lead' : undefined}>{showCompany ? 'Position / company' : 'Position'}</span>
       <span>Location</span>
       <span>Applied</span>
       <span>Status</span>

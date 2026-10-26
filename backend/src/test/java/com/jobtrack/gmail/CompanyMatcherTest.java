@@ -72,6 +72,8 @@ class CompanyMatcherTest {
     @Test
     void coreNameDropsLegalSuffixes() {
         assertThat(CompanyMatcher.coreName("Acme Corp, Inc.")).isEqualTo("acme");
+        assertThat(CompanyMatcher.coreName("OCBC e2 Power Sdn Bhd")).isEqualTo("ocbc e2 power");
+        assertThat(CompanyMatcher.coreName("OCBC Group")).isEqualTo("ocbc");
         assertThat(CompanyMatcher.coreName("Yalla Habibi Ltd. Şti.")).isEqualTo("yalla habibi");
         assertThat(CompanyMatcher.coreName("Inc")).isEqualTo("inc");
     }

@@ -14,7 +14,7 @@ frontend. Every number and list in the UI comes from the database; nothing is mo
 - **Accounts.** Register, log in and log out, and edit your profile. Passwords are hashed with BCrypt, and the API uses stateless JWT authentication.
 - **Companies.** Create, search, edit and delete companies, and see each company's applications.
 - **Company logos.** Every company gets its logo automatically, shown on company cards, application lists, detail pages and the update report. JobTrack works out the company's website (from its website field, job link, email senders, or a company-name lookup) and stores the large icon the site publishes for itself. Companies without one get a coloured initial. Only the company's name (for the lookup, via Clearbit's free autocomplete) and its public website are contacted; set `jobtrack.logos.enabled=false` to turn this off.
-- **Applications.** Track title, company, URL, location, employment type, salary range, application date and notes.
+- **Applications.** Track title, company, URL, location, employment type, salary range, application date and notes. A job can only be added once: the same posting link is recognised even with tracking parameters, `www.` or a trailing slash, and a company is matched by name regardless of endings like "Inc." or "Sdn Bhd".
 - **Status workflow.** Statuses run `SAVED → APPLIED → SCREENING → INTERVIEW → OFFER → ACCEPTED`, and `REJECTED` / `WITHDRAWN` can be reached from any open stage. Only valid transitions are allowed.
 - **Status history.** Every status change is recorded with the previous status, the new status and a timestamp, and shown as a timeline.
 - **Interviews.** Schedule, edit and delete interviews by type (recruiter, technical, system design, …) and status. Dates are validated: a scheduled interview must be in the future, and a completed one must be in the past.
@@ -164,7 +164,9 @@ never go to a third-party AI service.
   | Job alerts, newsletters, anything else | (no change) |
 
   Statuses only move forward along the normal workflow, and only when the model is at least 60%
-  confident (70% to add a new application; job alerts and newsletters never add one). Every email the AI read is listed on its application with the AI's one-line summary and
+  confident (70% to add a new application; job alerts and newsletters never add one). Changes made
+  by an email are dated by the email, not by when JobTrack read it, and the newest emails are read
+  first so recent news shows up straight away. Every email the AI read is listed on its application with the AI's one-line summary and
   the status change it made, so a wrong call is easy to spot and undo by hand.
 - **No reply.** An application still *Applied* or *Screening* with no news for 14 days gets a
   *No reply* badge.
@@ -232,7 +234,7 @@ No local database or configuration is needed.
 | Unit tests (JUnit 5 + Mockito) | Status transitions and history, application creation and update, validation rules, ownership (not-found for foreign ids), company creation, duplicate names and deletion rules, interview date rules, email status rules and the update summary, dashboard calculations (zero-filling, time zones), registration and login. |
 | Integration tests (`@SpringBootTest` + MockMvc + Testcontainers) | The full acceptance workflow (register → … → dashboard → search). User A vs. user B on every resource type. Page size, page number and filters combined with pagination. Sorting. Validation and error bodies. Transaction rollback when the history insert fails. |
 
-136 tests; all pass (plus the opt-in live tests: real AI with `-Dollama.live=true`, real company logos with `-Dlogos.live=true`).
+145 tests; all pass (plus the opt-in live tests: real AI with `-Dollama.live=true`, real company logos with `-Dlogos.live=true`).
 
 ## Setup
 

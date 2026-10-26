@@ -22,7 +22,8 @@ public final class CompanyMatcher {
     private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@([\\w-]+(?:\\.[\\w-]+)+)");
     private static final Set<String> LEGAL_SUFFIXES = Set.of(
             "inc", "incorporated", "ltd", "limited", "llc", "llp", "plc", "gmbh", "ag", "sa", "sas", "bv", "nv",
-            "co", "corp", "corporation", "company", "as", "a s", "sti", "ltd sti", "srl", "spa", "oy", "ab", "pty");
+            "co", "corp", "corporation", "company", "as", "a s", "sti", "ltd sti", "srl", "spa", "oy", "ab", "pty",
+            "sdn", "bhd", "berhad", "pte", "kk", "group", "holding", "holdings");
 
     private CompanyMatcher() {
     }

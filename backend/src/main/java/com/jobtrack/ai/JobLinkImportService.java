@@ -4,7 +4,8 @@ import com.jobtrack.dto.ai.JobLinkPreview;
 import com.jobtrack.entity.Company;
 import com.jobtrack.entity.EmploymentType;
 import com.jobtrack.exception.BadRequestException;
-import com.jobtrack.repository.CompanyRepository;
+import com.jobtrack.service.ApplicationService;
+import com.jobtrack.service.CompanyService;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Service;
@@ -49,20 +50,27 @@ public class JobLinkImportService {
 
     private final OllamaClient ollama;
     private final JsonMapper jsonMapper;
-    private final CompanyRepository companyRepository;
+    private final CompanyService companyService;
+    private final ApplicationService applicationService;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    public JobLinkImportService(OllamaClient ollama, JsonMapper jsonMapper, CompanyRepository companyRepository) {
+    public JobLinkImportService(OllamaClient ollama, JsonMapper jsonMapper, CompanyService companyService,
+                                ApplicationService applicationService) {
         this.ollama = ollama;
         this.jsonMapper = jsonMapper;
-        this.companyRepository = companyRepository;
+        this.companyService = companyService;
+        this.applicationService = applicationService;
     }
 
     public JobLinkPreview preview(Long userId, String url) {
         URI uri = validate(url);
+        // Checked before reading the page: no point making the user wait for a job they already have.
+        applicationService.findByJobUrl(userId, uri.toString()).ifPresent(existing -> {
+            throw new BadRequestException("url", ApplicationService.alreadyAdded(existing));
+        });
         Document document = Jsoup.parse(fetch(uri), uri.toString());
 
         ExtractedJob structured = JobPostingParser.fromStructuredData(document, jsonMapper);
@@ -80,7 +88,7 @@ public class JobLinkImportService {
 
         String companyName = JobPostingParser.truncate(result.companyName(), 149);
         Long matchedCompanyId = companyName == null ? null
-                : companyRepository.findFirstByUserIdAndNameIgnoreCase(userId, companyName).map(Company::getId).orElse(null);
+                : companyService.findSameCompany(userId, companyName).map(Company::getId).orElse(null);
         return new JobLinkPreview(
                 uri.toString(),
                 JobPostingParser.truncate(result.jobTitle(), 149),

@@ -6,7 +6,6 @@ import com.jobtrack.entity.ApplicationStatus;
 import com.jobtrack.entity.Company;
 import com.jobtrack.entity.EmailCategory;
 import com.jobtrack.entity.JobApplication;
-import com.jobtrack.repository.CompanyRepository;
 import com.jobtrack.repository.JobApplicationRepository;
 import com.jobtrack.service.ApplicationService;
 import com.jobtrack.service.CompanyService;
@@ -46,14 +45,12 @@ public class EmailApplicationResolver {
     }
 
     private final JobApplicationRepository applicationRepository;
-    private final CompanyRepository companyRepository;
     private final ApplicationService applicationService;
     private final CompanyService companyService;
 
-    public EmailApplicationResolver(JobApplicationRepository applicationRepository, CompanyRepository companyRepository,
+    public EmailApplicationResolver(JobApplicationRepository applicationRepository,
                                     ApplicationService applicationService, CompanyService companyService) {
         this.applicationRepository = applicationRepository;
-        this.companyRepository = companyRepository;
         this.applicationService = applicationService;
         this.companyService = companyService;
     }
@@ -132,7 +129,7 @@ public class EmailApplicationResolver {
 
     private JobApplication create(Long userId, GmailMessage message, EmailClassification reading) {
         String companyName = reading.companyName().strip();
-        Company company = companyRepository.findFirstByUserIdAndNameIgnoreCase(userId, companyName).orElse(null);
+        Company company = companyService.findSameCompany(userId, companyName).orElse(null);
         Long companyId = company != null ? company.getId() : companyService.create(userId,
                 new CompanyRequest(companyName, null, null, null, "Added automatically from your email.")).id();
 
@@ -141,7 +138,7 @@ public class EmailApplicationResolver {
         String notes = "Added automatically from an email received " + applied + ": \""
                 + (message.subject() == null ? "(no subject)" : message.subject()) + "\"";
         Long id = applicationService.create(userId, new CreateApplicationRequest(companyId, title, null, null, null,
-                null, null, null, applied, ApplicationStatus.APPLIED, notes)).id();
+                null, null, null, applied, ApplicationStatus.APPLIED, notes), message.receivedAt()).id();
         // Loaded with its company (this runs outside a web request, so lazy loading isn't available).
         return applicationRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
                 .filter(a -> a.getId().equals(id))

@@ -25,8 +25,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -76,8 +78,20 @@ public class ApplicationService {
      */
     @Transactional
     public ApplicationResponse create(Long userId, CreateApplicationRequest request) {
+        return create(userId, request, null);
+    }
+
+    /**
+     * Creates an application whose first status is recorded at {@code happenedAt} (e.g. the date of
+     * the email it was found in); null means now. The same job link can only be added once.
+     */
+    @Transactional
+    public ApplicationResponse create(Long userId, CreateApplicationRequest request, Instant happenedAt) {
         Company company = companyService.getOwnedCompany(userId, request.companyId());
         ApplicationStatus status = request.status() != null ? request.status() : ApplicationStatus.SAVED;
+        findByJobUrl(userId, request.jobUrl()).ifPresent(existing -> {
+            throw new ConflictException(alreadyAdded(existing));
+        });
 
         JobApplication application = new JobApplication(
                 userRepository.getReferenceById(userId), company, TextUtils.clean(request.jobTitle()), status);
@@ -87,7 +101,8 @@ public class ApplicationService {
         }
 
         applicationRepository.save(application);
-        recordStatusChange(application, null, status);
+        Instant at = happenedAt == null || happenedAt.isAfter(clock.instant()) ? clock.instant() : happenedAt;
+        historyRepository.save(new ApplicationStatusHistory(application, null, status, at));
         if (application.getJobUrl() != null) {
             companyService.lookUpLogoIfMissing(company);
         }
@@ -97,6 +112,11 @@ public class ApplicationService {
     @Transactional
     public ApplicationResponse update(Long userId, Long applicationId, UpdateApplicationRequest request) {
         JobApplication application = getOwnedApplication(userId, applicationId);
+        findByJobUrl(userId, request.jobUrl())
+                .filter(existing -> !existing.getId().equals(applicationId))
+                .ifPresent(existing -> {
+                    throw new ConflictException(alreadyAdded(existing));
+                });
         if (!application.getCompany().getId().equals(request.companyId())) {
             application.setCompany(companyService.getOwnedCompany(userId, request.companyId()));
         }
@@ -114,6 +134,16 @@ public class ApplicationService {
      */
     @Transactional
     public ApplicationResponse changeStatus(Long userId, Long applicationId, ApplicationStatus newStatus) {
+        return changeStatus(userId, applicationId, newStatus, null);
+    }
+
+    /**
+     * Same as {@link #changeStatus(Long, Long, ApplicationStatus)}, recorded at the time it actually
+     * happened (e.g. when the email arrived) rather than now. See {@link #historyTime}.
+     */
+    @Transactional
+    public ApplicationResponse changeStatus(Long userId, Long applicationId, ApplicationStatus newStatus,
+                                            Instant happenedAt) {
         JobApplication application = getOwnedApplication(userId, applicationId);
         ApplicationStatus previousStatus = application.getStatus();
 
@@ -124,11 +154,12 @@ public class ApplicationService {
             throw new ConflictException(transitionError(previousStatus, newStatus));
         }
 
+        Instant at = historyTime(applicationId, happenedAt);
         application.setStatus(newStatus);
         if (application.getApplicationDate() == null && newStatus != ApplicationStatus.SAVED) {
-            application.setApplicationDate(today());
+            application.setApplicationDate(LocalDate.ofInstant(at, clock.getZone()));
         }
-        recordStatusChange(application, previousStatus, newStatus);
+        historyRepository.save(new ApplicationStatusHistory(application, previousStatus, newStatus, at));
         applicationRepository.flush();
         return ApplicationMapper.toResponse(application);
     }
@@ -153,8 +184,39 @@ public class ApplicationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId));
     }
 
-    private void recordStatusChange(JobApplication application, ApplicationStatus from, ApplicationStatus to) {
-        historyRepository.save(new ApplicationStatusHistory(application, from, to, clock.instant()));
+    /**
+     * The user's application with this job link, if any. Links are compared without tracking
+     * parameters, #fragments, trailing slashes or letter case in the host, so the same posting
+     * shared from two places is still recognised.
+     */
+    @Transactional(readOnly = true)
+    public Optional<JobApplication> findByJobUrl(Long userId, String jobUrl) {
+        String wanted = JobUrls.normalize(jobUrl);
+        if (wanted == null) {
+            return Optional.empty();
+        }
+        return applicationRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
+                .filter(a -> wanted.equals(JobUrls.normalize(a.getJobUrl())))
+                .findFirst();
+    }
+
+    public static String alreadyAdded(JobApplication existing) {
+        return "You've already added this job: " + existing.getJobTitle() + " at " + existing.getCompany().getName()
+                + ".";
+    }
+
+    /**
+     * When a status change goes in the history: the time it happened, but never in the future and
+     * never before the application's previous change, so the timeline always reads in order.
+     */
+    private Instant historyTime(Long applicationId, Instant happenedAt) {
+        Instant now = clock.instant();
+        if (happenedAt == null || happenedAt.isAfter(now)) {
+            return now;
+        }
+        List<ApplicationStatusHistory> history = historyRepository.findByApplicationIdOrderByChangedAtAscIdAsc(applicationId);
+        Instant previous = history.isEmpty() ? null : history.get(history.size() - 1).getChangedAt();
+        return previous != null && happenedAt.isBefore(previous) ? previous : happenedAt;
     }
 
     private void applyFields(JobApplication application, ApplicationFields fields) {

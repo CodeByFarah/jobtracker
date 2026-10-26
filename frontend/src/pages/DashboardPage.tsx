@@ -13,6 +13,7 @@ import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../hooks/useAuth'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { dashboardApi, gmailApi } from '../services/api'
+import { timeAgo } from '../utils/format'
 
 export function DashboardPage() {
   useDocumentTitle('Dashboard')
@@ -89,7 +90,12 @@ export function DashboardPage() {
             <section className="card">
               <header className="section-header">
                 <h2>Latest from your inbox</h2>
-                <Link to="/profile">Gmail settings</Link>
+                <span className="section-header-meta">
+                  {gmail.data.lastSyncedAt && (
+                    <span className="muted">Checked {timeAgo(gmail.data.lastSyncedAt)}</span>
+                  )}
+                  <Link to="/profile">Gmail settings</Link>
+                </span>
               </header>
               {lastCheck?.overview && <p className="inbox-overview">{lastCheck.overview}</p>}
               {inbox.data && inbox.data.length > 0 ? (

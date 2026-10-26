@@ -18,7 +18,8 @@ function niceMax(value: number): number {
  */
 export function ApplicationsOverTimeChart({ series }: { series: Series }) {
   const peak = Math.max(0, ...series.map((m) => m.count))
-  const axisMax = niceMax(peak)
+  // Even, so the middle gridline is a whole number of applications (6 / 3 / 0, never 5 / 2.5 / 0).
+  const axisMax = Math.ceil(niceMax(peak) / 2) * 2
   const ticks = [axisMax, axisMax / 2, 0]
   const lastIndex = series.length - 1
   const peakIndex = series.findIndex((m) => m.count === peak)

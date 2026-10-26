@@ -25,7 +25,8 @@ class CompanyLogoFinderLiveTest {
             "Trendyol          |                                             | trendyol.com",
             "Spotify           | Spotify Jobs <no-reply@spotify.com>         | spotify.com",
             "Shopify           |                                             | shopify.com",
-            "Monzo             | https://monzo.com/careers                   | monzo.com"})
+            "Monzo             | https://monzo.com/careers                   | monzo.com",
+            "OCBC e2 Power Sdn Bhd | https://ocbc.wd102.myworkdayjobs.com/en-US/External/job/1 | ocbc.com"})
     void findsTheLogoOfARealCompany(String name, String hint, String expectedDomain) {
         long started = System.nanoTime();
         Optional<CompanyLogoFinder.FoundLogo> logo = finder.find(name, hint == null ? List.of() : List.of(hint));

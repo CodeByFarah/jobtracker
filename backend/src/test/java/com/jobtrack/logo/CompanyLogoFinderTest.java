@@ -26,9 +26,22 @@ class CompanyLogoFinderTest {
     }
 
     @Test
+    void recruitingSiteLinksNameTheCompanyInShort() {
+        assertThat(CompanyLogoFinder.recruitingSiteSlug("https://ocbc.wd102.myworkdayjobs.com/en-US/External/job/123"))
+                .isEqualTo("ocbc");
+        assertThat(CompanyLogoFinder.recruitingSiteSlug("https://boards.greenhouse.io/stripe/jobs/42")).isEqualTo("stripe");
+        assertThat(CompanyLogoFinder.recruitingSiteSlug("https://jobs.lever.co/acme-labs/abc")).isEqualTo("acme-labs");
+        assertThat(CompanyLogoFinder.recruitingSiteSlug("https://acme.bamboohr.com/careers/7")).isEqualTo("acme");
+        assertThat(CompanyLogoFinder.recruitingSiteSlug("https://acme.com/careers")).isNull();
+        assertThat(CompanyLogoFinder.recruitingSiteSlug("Jobs <jobs@acme.com>")).isNull();
+    }
+
+    @Test
     void jobBoardsRecruitingToolsAndMailProvidersAreNotTheCompany() {
         assertThat(CompanyLogoFinder.isCompanySite("greenhouse.io")).isFalse();
         assertThat(CompanyLogoFinder.isCompanySite("myworkday.com")).isFalse();
+        assertThat(CompanyLogoFinder.isCompanySite(CompanyLogoFinder.domainOf("https://ocbc.wd102.myworkdayjobs.com/x")))
+                .isFalse();
         assertThat(CompanyLogoFinder.isCompanySite("linkedin.com")).isFalse();
         assertThat(CompanyLogoFinder.isCompanySite("gmail.com")).isFalse();
         assertThat(CompanyLogoFinder.isCompanySite("kariyer.net")).isFalse();
@@ -52,6 +65,12 @@ class CompanyLogoFinderTest {
                 "https://acme.com/icon-192.png", "https://acme.com/apple-touch-icon.png",
                 "https://acme.com/favicon-32.png");
         assertThat(icons.get(1).size()).isEqualTo(180); // apple-touch-icon without sizes
+    }
+
+    @Test
+    void googlesGenericGlobeIsNotALogo() throws IOException {
+        assertThat(CompanyLogoFinder.isPlaceholder(png(96))).isFalse();
+        assertThat(CompanyLogoFinder.PLACEHOLDER_IMAGES).hasSize(3);
     }
 
     @Test

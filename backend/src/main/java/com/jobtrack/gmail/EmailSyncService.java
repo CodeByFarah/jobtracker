@@ -11,6 +11,7 @@ import com.jobtrack.entity.JobApplication;
 import com.jobtrack.exception.AiUnavailableException;
 import com.jobtrack.exception.ConflictException;
 import com.jobtrack.exception.GmailAuthException;
+import com.jobtrack.logo.CompanyLogoService;
 import com.jobtrack.repository.EmailEventRepository;
 import com.jobtrack.repository.GmailConnectionRepository;
 import com.jobtrack.repository.JobApplicationRepository;
@@ -71,6 +72,7 @@ public class EmailSyncService {
     private final EmailClassifier classifier;
     private final UpdateSummaryWriter summaryWriter;
     private final EmailApplicationResolver resolver;
+    private final CompanyLogoService logoService;
     private final GmailProperties properties;
     private final Clock clock;
 
@@ -88,7 +90,8 @@ public class EmailSyncService {
                             JobApplicationRepository applicationRepository, UserRepository userRepository,
                             ApplicationService applicationService, GmailConnectionService connectionService,
                             GmailApiClient gmail, EmailClassifier classifier, UpdateSummaryWriter summaryWriter,
-                            EmailApplicationResolver resolver, GmailProperties properties, Clock clock) {
+                            EmailApplicationResolver resolver, CompanyLogoService logoService,
+                            GmailProperties properties, Clock clock) {
         this.connectionRepository = connectionRepository;
         this.eventRepository = eventRepository;
         this.applicationRepository = applicationRepository;
@@ -99,6 +102,7 @@ public class EmailSyncService {
         this.classifier = classifier;
         this.summaryWriter = summaryWriter;
         this.resolver = resolver;
+        this.logoService = logoService;
         this.properties = properties;
         this.clock = clock;
     }
@@ -236,7 +240,7 @@ public class EmailSyncService {
         if (application != null && classification.confidence() >= MIN_CONFIDENCE_TO_UPDATE) {
             for (ApplicationStatus step : EmailStatusRules.steps(after, classification.category())) {
                 try {
-                    applicationService.changeStatus(userId, application.getId(), step);
+                    applicationService.changeStatus(userId, application.getId(), step, message.receivedAt());
                     after = step;
                 } catch (ConflictException e) {
                     log.info("Skipped status change for application {}: {}", application.getId(), e.getMessage());
@@ -260,6 +264,11 @@ public class EmailSyncService {
             eventRepository.save(event);
         } catch (DataIntegrityViolationException e) {
             log.debug("Email {} was already recorded", message.id());
+        }
+        if (application != null) {
+            // Now that the email is saved, its sender's address can point the logo lookup at the
+            // company's website.
+            logoService.lookUpIfMissing(application.getCompany());
         }
         if (application == null || after == before) {
             return null;

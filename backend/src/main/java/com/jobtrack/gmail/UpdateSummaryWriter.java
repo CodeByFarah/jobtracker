@@ -36,6 +36,10 @@ public class UpdateSummaryWriter {
     }
 
     public String write(List<JobApplication> applications, List<StatusChange> changes, int emailsRead, Instant now) {
+        if (changes.isEmpty() && emailsRead == 0) {
+            // Nothing new: the plain summary says it instantly, without waiting on the model.
+            return plainSummary(applications, changes, emailsRead, now);
+        }
         String facts = facts(applications, changes, emailsRead, now);
         try {
             String prompt = """

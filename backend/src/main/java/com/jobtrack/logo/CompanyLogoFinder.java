@@ -23,7 +23,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -31,6 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -57,7 +61,9 @@ public class CompanyLogoFinder {
 
     /** Hosts that are never the employer's own site: job boards, recruiting software, email providers. */
     static final Set<String> NOT_COMPANY_SITES = Set.copyOf(Stream.concat(JobEmailFilter.HIRING_DOMAINS.stream(),
-            Stream.of("linkedin.com", "indeed.com", "indeedemail.com", "glassdoor.com", "kariyer.net",
+            Stream.of("myworkdayjobs.com", "myworkdaysite.com", "ashbyhq.com", "lever.co", "breezy.hr",
+                    "jobs.personio.de", "jobs.personio.com", "linkedin.com", "indeed.com", "indeedemail.com",
+                    "glassdoor.com", "kariyer.net",
                     "secretcv.com", "yenibiris.com", "eleman.net", "wellfound.com", "otta.com",
                     "welcometothejungle.com", "ziprecruiter.com", "monster.com", "talent.com", "jooble.org",
                     "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com",
@@ -100,7 +106,22 @@ public class CompanyLogoFinder {
             }
         }
         if (domains.isEmpty()) {
-            lookUpDomain(companyName).ifPresent(domains::add);
+            String wanted = CompanyMatcher.coreName(companyName);
+            lookUpDomain(companyName, wanted::equals).ifPresent(domains::add);
+        }
+        if (domains.isEmpty()) {
+            // Recruiting-site links name the company in short (ocbc.wd102.myworkdayjobs.com,
+            // boards.greenhouse.io/stripe): look that up, accepting the same name or the start of it.
+            String wanted = CompanyMatcher.coreName(companyName);
+            for (String slug : hints.stream().map(CompanyLogoFinder::recruitingSiteSlug).filter(s -> s != null).distinct().toList()) {
+                Optional<String> domain = lookUpDomain(slug, found -> found.equals(slug.replace('-', ' '))
+                        || wanted.equals(found) || wanted.startsWith(found + " "))
+                        .or(() -> guessDomain(slug, wanted));
+                if (domain.isPresent()) {
+                    domains.add(domain.get());
+                    break;
+                }
+            }
         }
         for (String domain : domains.stream().limit(3).toList()) {
             Optional<FoundLogo> found = fromDomain(domain);
@@ -185,36 +206,114 @@ public class CompanyLogoFinder {
         return best;
     }
 
-    /** Asks Clearbit's free company-name autocomplete for the domain of an exact name match. */
-    private Optional<String> lookUpDomain(String companyName) {
-        String wanted = CompanyMatcher.coreName(companyName);
-        if (wanted.length() < 2) {
+    /**
+     * Asks Clearbit's free company-name autocomplete for a domain, taking the first suggestion whose
+     * (simplified) name {@code accepts}.
+     */
+    private Optional<String> lookUpDomain(String query, Predicate<String> accepts) {
+        if (query == null || CompanyMatcher.coreName(query).length() < 2) {
             return Optional.empty();
         }
         try {
             Fetched result = fetch(URI.create("https://autocomplete.clearbit.com/v1/companies/suggest?query="
-                    + URLEncoder.encode(companyName.strip(), StandardCharsets.UTF_8)), 200_000);
+                    + URLEncoder.encode(query.strip(), StandardCharsets.UTF_8)), 200_000);
             if (result == null) {
                 return Optional.empty();
             }
             JsonNode suggestions = jsonMapper.readTree(result.body());
             for (JsonNode suggestion : suggestions) {
                 String domain = domainOf(suggestion.path("domain").asString(""));
-                if (domain != null && isCompanySite(domain)
-                        && CompanyMatcher.coreName(suggestion.path("name").asString("")).equals(wanted)) {
+                String name = CompanyMatcher.coreName(suggestion.path("name").asString(""));
+                if (domain != null && isCompanySite(domain) && name.length() >= 2 && accepts.test(name)) {
                     return Optional.of(domain);
                 }
             }
         } catch (RuntimeException e) {
-            log.debug("Company lookup for '{}' failed: {}", companyName, e.getMessage());
+            log.debug("Company lookup for '{}' failed: {}", query, e.getMessage());
         }
         return Optional.empty();
+    }
+
+    /**
+     * {@code <slug>.com}, when there are two pieces of evidence it is the company's: the site is up,
+     * and either its title names the slug or the company's own name starts with it ("OCBC e2 Power"
+     * and ocbc.wd102.myworkdayjobs.com). A look-alike or parked domain isn't taken on the link alone.
+     */
+    private Optional<String> guessDomain(String slug, String companyCoreName) {
+        if (slug.length() < 3 || slug.contains("-")) {
+            return Optional.empty();
+        }
+        String domain = slug + ".com";
+        try {
+            Fetched page = fetch(URI.create("https://" + domain + "/"), MAX_PAGE_BYTES);
+            if (page == null || !page.contentType().contains("html")) {
+                return Optional.empty();
+            }
+            if (companyCoreName.equals(slug) || companyCoreName.startsWith(slug + " ")) {
+                return Optional.of(domain);
+            }
+            Document document = Jsoup.parse(new String(page.body(), StandardCharsets.UTF_8), page.finalUri().toString());
+            String names = " " + CompanyMatcher.normalize(document.title() + " "
+                    + document.select("meta[property=og:site_name]").attr("content")) + " ";
+            return names.contains(" " + slug + " ") ? Optional.of(domain) : Optional.empty();
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The company's short name in a recruiting-site link, or null: the tenant in
+     * {@code ocbc.wd102.myworkdayjobs.com} or {@code acme.bamboohr.com}, or the first path part in
+     * {@code boards.greenhouse.io/stripe} or {@code jobs.lever.co/acme}.
+     */
+    static String recruitingSiteSlug(String hint) {
+        if (hint == null || !hint.contains("://")) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(hint.strip());
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            String[] path = (uri.getPath() == null ? "" : uri.getPath()).replaceFirst("^/+", "").split("/");
+            String slug = null;
+            if (host.matches(".+\\.(myworkdayjobs|myworkdaysite|bamboohr|recruitee|teamtailor|applytojob)\\.com")
+                    || host.matches(".+\\.breezy\\.hr") || host.matches(".+\\.jobs\\.personio\\.(de|com)")) {
+                slug = host.substring(0, host.indexOf('.'));
+            } else if (host.matches("(boards|job-boards)(\\.eu)?\\.greenhouse\\.io|jobs(\\.eu)?\\.lever\\.co"
+                    + "|jobs\\.ashbyhq\\.com|jobs\\.smartrecruiters\\.com|apply\\.workable\\.com")) {
+                slug = path.length > 0 ? path[0] : null;
+            }
+            if (slug == null) {
+                return null;
+            }
+            slug = slug.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9-]", "");
+            return slug.length() >= 2 && !slug.equals("embed") && !slug.equals("careers") ? slug : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Google's favicon service answers with the same grey globe for every site it has no icon for
+     * (some sites, e.g. ones that block automated visitors). That isn't the company's logo, so it's
+     * refused and the company keeps its letter tile. SHA-256 of each size/format Google serves.
+     */
+    static final Set<String> PLACEHOLDER_IMAGES = Set.of(
+            "b6b2c1e6b1a515177baf79871c21db0f13372de333bc2763f1b45c09aabd1780",
+            "493506d686597b9e91c1cb2736600ac22190762e0ced2fba848b8dd623cc4f15",
+            "59bfe9bc385ad69f50793ce4a53397316d7a875a7148a63c16df9b674c6cda64");
+
+    static boolean isPlaceholder(byte[] image) {
+        try {
+            return PLACEHOLDER_IMAGES.contains(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(image)));
+        } catch (NoSuchAlgorithmException e) {
+            return false;
+        }
     }
 
     private Optional<Fetched> downloadImage(String url) {
         try {
             Fetched image = fetch(URI.create(url), MAX_IMAGE_BYTES);
-            if (image == null || image.body().length < MIN_IMAGE_BYTES) {
+            if (image == null || image.body().length < MIN_IMAGE_BYTES || isPlaceholder(image.body())) {
                 return Optional.empty();
             }
             String type = imageType(image.body());

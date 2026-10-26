@@ -7,6 +7,7 @@ import com.jobtrack.entity.Company;
 import com.jobtrack.entity.CompanyLogo;
 import com.jobtrack.exception.ConflictException;
 import com.jobtrack.exception.ResourceNotFoundException;
+import com.jobtrack.gmail.CompanyMatcher;
 import com.jobtrack.logo.CompanyLogoService;
 import com.jobtrack.mapper.ApplicationMapper;
 import com.jobtrack.mapper.CompanyMapper;
@@ -114,6 +115,21 @@ public class CompanyService {
         return applicationRepository.findByCompanyIdAndUserIdOrderByUpdatedAtDesc(companyId, userId).stream()
                 .map(ApplicationMapper::toResponse)
                 .toList();
+    }
+
+    /**
+     * The user's company with this name, ignoring case, punctuation and legal endings, so "Acme
+     * Inc." finds "ACME" and no second company is created for the same employer.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Company> findSameCompany(Long userId, String name) {
+        String wanted = CompanyMatcher.coreName(name);
+        if (wanted.isEmpty()) {
+            return Optional.empty();
+        }
+        return companyRepository.findByUserIdOrderByNameAsc(userId).stream()
+                .filter(company -> CompanyMatcher.coreName(company.getName()).equals(wanted))
+                .findFirst();
     }
 
     /** A company's new job link may point at its website: look for a logo if there isn't one yet. */

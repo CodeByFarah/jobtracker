@@ -154,6 +154,11 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.content[0].jobTitle").value("Data Analyst"))
                 .andExpect(jsonPath("$.content[0].status").value("INTERVIEW"))
                 .andExpect(jsonPath("$.content[0].applicationDate").value("2026-09-20"));
+        // The timeline is dated by the email, not by when JobTrack read it.
+        long initech = json(getJson("/api/applications", token)).get("content").get(0).get("id").asLong();
+        getJson("/api/applications/" + initech + "/history", token)
+                .andExpect(jsonPath("$[*].newStatus").value(org.hamcrest.Matchers.contains("APPLIED", "INTERVIEW")))
+                .andExpect(jsonPath("$[1].changedAt").value("2026-09-28T09:00:00Z"));
         getJson("/api/gmail/report", token)
                 .andExpect(jsonPath("$.lastCheck.emailsAnalyzed").value(3))
                 .andExpect(jsonPath("$.lastCheck.changes.length()").value(1))

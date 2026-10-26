@@ -70,6 +70,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   try {
     response = await fetch(API_BASE + path, {
       method,
+      // Lets the Gmail sign-in cookie work when the API runs on another origin (VITE_API_BASE_URL).
+      credentials: 'include',
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })

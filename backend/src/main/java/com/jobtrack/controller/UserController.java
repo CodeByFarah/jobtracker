@@ -1,5 +1,6 @@
 package com.jobtrack.controller;
 
+import com.jobtrack.dto.user.DeleteAccountRequest;
 import com.jobtrack.dto.user.UpdateProfileRequest;
 import com.jobtrack.dto.user.UserResponse;
 import com.jobtrack.security.CurrentUser;
@@ -8,7 +9,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,5 +42,15 @@ public class UserController {
     @ApiResponse(responseCode = "400", description = "Validation failed")
     public UserResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         return userService.updateProfile(currentUser.id(), request);
+    }
+
+    @PostMapping("/delete")
+    @Operation(summary = "Delete my account", description = "Permanently deletes the account and all its data, "
+            + "and revokes JobTrack's Gmail access. Requires the account password.")
+    @ApiResponse(responseCode = "204", description = "Deleted")
+    @ApiResponse(responseCode = "400", description = "Wrong password")
+    public ResponseEntity<Void> deleteAccount(@Valid @RequestBody DeleteAccountRequest request) {
+        userService.deleteAccount(currentUser.id(), request.password());
+        return ResponseEntity.noContent().build();
     }
 }

@@ -22,7 +22,7 @@ export function GmailPrompt({ onUpdated }: { onUpdated?: () => void }) {
       <div className="gmail-banner-text">
         <h2>Let your inbox update JobTrack</h2>
         <p className="muted">
-          Connect Gmail and your local AI tracks replies, interviews and rejections, and keeps every application current.
+          Connect Gmail and the AI tracks replies, interviews and rejections, and keeps every application current.
         </p>
       </div>
       <button type="button" className="button button-primary" onClick={() => setOpen(true)}>

@@ -55,7 +55,7 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
         long globex = createApplication(token, createCompany(token, "Globex"), "Designer", "SAVED");
 
         GmailConnection connection = new GmailConnection(userRepository.getReferenceById(userId));
-        connection.setGmailAddress("me@gmail.com");
+        connection.setGmailAddress("me-" + userId + "@gmail.com"); // a mailbox belongs to one account
         connection.setRefreshTokenEncrypted(tokenCipher.encrypt("refresh-" + userId));
         connectionRepository.save(connection);
 
@@ -116,7 +116,7 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
         String token = registerUser();
         long userId = json(getJson("/api/users/me", token)).get("id").asLong();
         GmailConnection connection = new GmailConnection(userRepository.getReferenceById(userId));
-        connection.setGmailAddress("me@gmail.com");
+        connection.setGmailAddress("me-" + userId + "@gmail.com"); // a mailbox belongs to one account
         connection.setRefreshTokenEncrypted(tokenCipher.encrypt("refresh-" + userId));
         connectionRepository.save(connection);
 
@@ -172,7 +172,7 @@ class EmailSyncIntegrationTest extends IntegrationTestSupport {
         long userId = json(getJson("/api/users/me", token)).get("id").asLong();
         long acme = createApplication(token, createCompany(token, "Acme"), "Backend Engineer", "APPLIED");
         GmailConnection connection = new GmailConnection(userRepository.getReferenceById(userId));
-        connection.setGmailAddress("me@gmail.com");
+        connection.setGmailAddress("me-" + userId + "@gmail.com"); // a mailbox belongs to one account
         connection.setRefreshTokenEncrypted(tokenCipher.encrypt("refresh-" + userId));
         connectionRepository.save(connection);
 

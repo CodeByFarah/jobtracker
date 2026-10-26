@@ -67,8 +67,8 @@ export function GmailCard() {
         </h2>
       </header>
       <p className="muted gmail-intro">
-        Your local AI reads job-related emails and updates your applications: interview invites, rejections,
-        offers and confirmations. Access is read-only and nothing leaves this computer except the requests to Gmail.
+        JobTrack’s AI reads job-related emails and updates your applications: interview invites, rejections,
+        offers and confirmations. Access is read-only, and only the one Gmail account you connect is read.
       </p>
 
       {flash.result === 'connected' && (

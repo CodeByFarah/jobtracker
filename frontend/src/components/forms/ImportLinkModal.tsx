@@ -41,7 +41,7 @@ export function ImportLinkModal({ onClose, onImported }: ImportLinkModalProps) {
     >
       <form id="import-link-form" className="form" onSubmit={submit} noValidate>
         <p className="muted import-intro">
-          Paste the link to the job posting. Your local AI reads it and fills in the title, company, location and
+          Paste the link to the job posting. The AI reads it and fills in the title, company, location and
           salary for you to check.
         </p>
         {formError && !fieldErrors.url && <p className="form-error" role="alert">{formError}</p>}
@@ -64,7 +64,7 @@ export function ImportLinkModal({ onClose, onImported }: ImportLinkModalProps) {
         {submitting && (
           <p className="import-progress" role="status">
             <span className="spinner" aria-hidden="true" />
-            Reading the posting with your local AI. This can take up to a minute.
+            Reading the posting with the AI. This can take up to a minute.
           </p>
         )}
       </form>

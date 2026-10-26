@@ -53,6 +53,11 @@ jobtrack:
     initial-sync-days: ${GMAIL_INITIAL_SYNC_DAYS:180}
     max-messages-per-sync: ${GMAIL_MAX_MESSAGES_PER_SYNC:500}
     sync-interval: ${GMAIL_SYNC_INTERVAL:PT30M}
+    # Mailboxes checked at the same time by this instance. Raise it when the AI can serve
+    # several requests at once (a GPU server, or more Ollama instances behind OLLAMA_URL).
+    sync-workers: ${GMAIL_SYNC_WORKERS:1}
+    # Key that encrypts the stored Gmail access. Falls back to JWT_SECRET; set its own in production.
+    token-encryption-key: ${TOKEN_ENCRYPTION_KEY:}
 
 springdoc:
   api-docs:

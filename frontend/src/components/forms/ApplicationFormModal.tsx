@@ -120,7 +120,7 @@ export function ApplicationFormModal({ application, defaultCompanyId, prefill, o
           <p className="notice" role="status">
             {prefill.source === 'PAGE_DATA'
               ? 'Filled in from the job posting.'
-              : 'Filled in by your local AI from the job posting. It can make mistakes.'}{' '}
+              : 'Filled in by AI from the job posting. It can make mistakes.'}{' '}
             Check the details, then add the application.
           </p>
         )}

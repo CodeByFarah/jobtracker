@@ -31,20 +31,25 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Reads new Gmail messages, lets the AI decide what each one means, and moves the matching
  * applications forward automatically. Every email the AI read is stored as an {@link EmailEvent},
  * so the user can see why a status changed and nothing is processed twice.
  * <p>
- * Syncs run in the background on a single worker thread: the local model handles one request at
- * a time anyway, and a sync can take minutes on a laptop CPU.
+ * Syncs run in the background on a small worker pool (GMAIL_SYNC_WORKERS, default 1: a local
+ * model handles one request at a time anyway). The sync state (a lease, progress and the last
+ * report) is kept on the mailbox's row in the database, so any number of backend instances can
+ * run together without checking the same mailbox twice, and each can show any user's progress.
  */
 @Service
 public class EmailSyncService {
@@ -61,6 +66,8 @@ public class EmailSyncService {
      */
     private static final String BASE_QUERY =
             "-in:sent -in:drafts -in:chats -in:spam -in:trash -category:promotions";
+    /** How long a check may go without reporting progress before another instance may take over. */
+    static final Duration LEASE = Duration.ofMinutes(10);
 
     private final GmailConnectionRepository connectionRepository;
     private final EmailEventRepository eventRepository;
@@ -74,24 +81,19 @@ public class EmailSyncService {
     private final EmailApplicationResolver resolver;
     private final CompanyLogoService logoService;
     private final GmailProperties properties;
+    private final JsonMapper jsonMapper;
     private final Clock clock;
 
-    private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "gmail-sync");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final ExecutorService worker;
+    /** Users queued or running on this instance, so a double click doesn't queue a second check. */
     private final Set<Long> queuedOrRunning = ConcurrentHashMap.newKeySet();
-    private final Map<Long, SyncSummary> lastRuns = new ConcurrentHashMap<>();
-    /** userId -> {emails processed, emails to process} while a check runs. */
-    private final Map<Long, int[]> progress = new ConcurrentHashMap<>();
 
     public EmailSyncService(GmailConnectionRepository connectionRepository, EmailEventRepository eventRepository,
                             JobApplicationRepository applicationRepository, UserRepository userRepository,
                             ApplicationService applicationService, GmailConnectionService connectionService,
                             GmailApiClient gmail, EmailClassifier classifier, UpdateSummaryWriter summaryWriter,
                             EmailApplicationResolver resolver, CompanyLogoService logoService,
-                            GmailProperties properties, Clock clock) {
+                            GmailProperties properties, JsonMapper jsonMapper, Clock clock) {
         this.connectionRepository = connectionRepository;
         this.eventRepository = eventRepository;
         this.applicationRepository = applicationRepository;
@@ -104,7 +106,14 @@ public class EmailSyncService {
         this.resolver = resolver;
         this.logoService = logoService;
         this.properties = properties;
+        this.jsonMapper = jsonMapper;
         this.clock = clock;
+        AtomicInteger threads = new AtomicInteger();
+        this.worker = Executors.newFixedThreadPool(properties.syncWorkers(), runnable -> {
+            Thread thread = new Thread(runnable, "gmail-sync-" + threads.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     /** Queues a sync for the user. Returns false if one is already queued or running. */
@@ -124,18 +133,23 @@ public class EmailSyncService {
         return true;
     }
 
-    public boolean isSyncing(Long userId) {
-        return queuedOrRunning.contains(userId);
+    /** Where the user's check stands, as any instance sees it. */
+    public State state(Long userId) {
+        Optional<GmailConnectionRepository.SyncState> stored = connectionRepository.findSyncState(userId, clock.instant());
+        boolean syncing = queuedOrRunning.contains(userId)
+                || stored.map(s -> Boolean.TRUE.equals(s.getSyncing())).orElse(false);
+        int done = stored.map(s -> s.getDone() == null ? 0 : s.getDone()).orElse(0);
+        int total = stored.map(s -> s.getTotal() == null ? 0 : s.getTotal()).orElse(0);
+        SyncSummary lastRun = stored.map(GmailConnectionRepository.SyncState::getReport).map(this::readReport).orElse(null);
+        return new State(syncing, done, total, lastRun);
+    }
+
+    /** {@code done}/{@code total} are emails read so far and to read; both 0 when idle or still listing. */
+    public record State(boolean syncing, int done, int total, SyncSummary lastRun) {
     }
 
     public Optional<SyncSummary> lastRun(Long userId) {
-        return Optional.ofNullable(lastRuns.get(userId));
-    }
-
-    /** {done, total} for a running check; {0, 0} when idle or still listing emails. */
-    public int[] progress(Long userId) {
-        int[] current = progress.get(userId);
-        return current == null ? new int[]{0, 0} : current.clone();
+        return Optional.ofNullable(state(userId).lastRun());
     }
 
     @PreDestroy
@@ -150,14 +164,18 @@ public class EmailSyncService {
             return;
         }
         GmailConnection connection = found.get();
+        Long connectionId = connection.getId();
         Instant startedAt = clock.instant();
+        if (connectionRepository.claimSync(connectionId, startedAt, startedAt.plus(LEASE)) == 0) {
+            log.info("Gmail sync for user {} skipped: a check is already running", userId);
+            return;
+        }
         int scanned = 0;
         int analyzed = 0;
         List<StatusChange> changes = new ArrayList<>();
         String error = null;
         String overview = null;
-        int[] counter = {0, 0};
-        progress.put(userId, counter);
+        boolean stillConnected = true;
         try {
             String accessToken = connectionService.accessToken(connection);
             List<String> trackedCompanies = applicationRepository.findByUserIdOrderByUpdatedAtDesc(userId).stream()
@@ -175,9 +193,12 @@ public class EmailSyncService {
             // months of mail to read. Statuses only ever move forward (EmailStatusRules), so an older
             // email read afterwards can't undo a newer one.
             messages.sort(Comparator.comparing(GmailMessage::receivedAt).reversed());
-            counter[1] = messages.size();
+            stillConnected = reportProgress(connectionId, 0, messages.size());
 
             for (GmailMessage message : messages) {
+                if (!stillConnected) {
+                    break; // disconnected or switched to another mailbox meanwhile: stop reading this one
+                }
                 scanned++;
                 // Re-read every time: an earlier email in this run may have changed or closed an application.
                 List<JobApplication> open = applicationRepository.findByUserIdAndStatusIn(userId, OPEN);
@@ -192,7 +213,11 @@ public class EmailSyncService {
                         changes.add(change);
                     }
                 }
-                counter[0] = scanned;
+                stillConnected = reportProgress(connectionId, scanned, messages.size());
+            }
+            if (!stillConnected) {
+                log.info("Gmail sync for user {} stopped: the mailbox was disconnected", userId);
+                return;
             }
             overview = summaryWriter.write(applicationRepository.findByUserIdOrderByUpdatedAtDesc(userId),
                     changes, analyzed, clock.instant());
@@ -205,15 +230,14 @@ public class EmailSyncService {
             // Anything else must still end the check with a visible error, never a silent "no new emails".
             log.error("Gmail sync for user {} failed unexpectedly", userId, e);
             error = "The check stopped because of an unexpected error. Please try again.";
-        } finally {
-            progress.remove(userId);
         }
 
         // Only move the "read up to" mark forward after a complete run, so a failed run is retried.
         Instant finishedAt = clock.instant();
-        updateConnection(userId, error == null ? startedAt : null, error);
-        lastRuns.put(userId, new SyncSummary(startedAt, finishedAt, scanned, analyzed, changes.size(), error,
-                List.copyOf(changes), overview));
+        updateConnection(connectionId, error == null ? startedAt : null, error);
+        SyncSummary summary = new SyncSummary(startedAt, finishedAt, scanned, analyzed, changes.size(), error,
+                List.copyOf(changes), overview);
+        connectionRepository.finishSync(connectionId, writeReport(summary));
         log.info("Gmail sync for user {}: {} new emails, {} read by AI, {} applications updated{}",
                 userId, scanned, analyzed, changes.size(), error == null ? "" : " (stopped: " + error + ")");
     }
@@ -277,15 +301,33 @@ public class EmailSyncService {
                 before, after, classification.summary());
     }
 
-    private void updateConnection(Long userId, Instant syncedAt, String error) {
-        connectionRepository.findByUserId(userId).ifPresent(connection -> {
-            if (syncedAt != null) {
-                connection.setLastSyncedAt(syncedAt);
-            }
-            connection.setLastSyncError(error);
-            connectionRepository.save(connection);
-        });
+    /** Saves progress (which also keeps the lease). False if the mailbox is no longer connected. */
+    private boolean reportProgress(Long connectionId, int done, int total) {
+        return connectionRepository.recordProgress(connectionId, done, total, clock.instant().plus(LEASE)) > 0;
     }
+
+    private String writeReport(SyncSummary summary) {
+        try {
+            return jsonMapper.writeValueAsString(summary);
+        } catch (JacksonException e) {
+            log.warn("Could not store the check report: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private SyncSummary readReport(String json) {
+        try {
+            return jsonMapper.readValue(json, SyncSummary.class);
+        } catch (JacksonException e) {
+            return null; // written by an older version: the next check replaces it
+        }
+    }
+
+    /** Updates the mailbox the check started on; a mailbox connected since then is left alone. */
+    private void updateConnection(Long connectionId, Instant syncedAt, String error) {
+        connectionRepository.recordResult(connectionId, syncedAt, error, clock.instant());
+    }
+
 
     /**
      * Gmail search for likely job mail (hiring senders, application wording, or a tracked company's

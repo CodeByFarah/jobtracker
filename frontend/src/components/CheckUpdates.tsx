@@ -149,7 +149,7 @@ function Progress({ status }: { status: GmailStatus }) {
         </>
       )}
       <p className="muted updates-working-note">
-        Your local AI only reads emails that mention a company you applied to. This can take a few minutes; you can
+        The AI only reads emails that mention a company you applied to. This can take a few minutes; you can
         close this window and the check keeps running.
       </p>
     </div>
@@ -184,11 +184,11 @@ function ConnectPrompt({ onConnected }: { onConnected: () => void }) {
       </span>
       <p className="connect-lead">
         Connect Gmail and JobTrack keeps every application up to date for you: confirmations, interview invites, offers
-        and rejections are read by your local AI and applied automatically.
+        and rejections are read by AI and applied automatically.
       </p>
       <ul className="connect-points">
         <li>Read-only access. JobTrack can never send, delete or change email.</li>
-        <li>Only job-related emails are read, by an AI running on this computer.</li>
+        <li>Only job-related emails are read, and only from the Gmail account you connect.</li>
         <li>Disconnect any time from your profile.</li>
       </ul>
       {state.kind === 'error' && (
@@ -218,7 +218,7 @@ function Report({ report, onNavigate }: { report: UpdateReport; onNavigate: () =
       {check?.overview && <p className="report-overview">{check.overview}</p>}
       {check && (
         <p className="muted report-stats">
-          {pluralize(check.messagesScanned, 'new email')} · {check.emailsAnalyzed} read by the AI ·{' '}
+          {pluralize(check.messagesScanned, 'new email')} · {check.emailsAnalyzed} read by AI ·{' '}
           {pluralize(check.statusesUpdated, 'application')} updated
         </p>
       )}

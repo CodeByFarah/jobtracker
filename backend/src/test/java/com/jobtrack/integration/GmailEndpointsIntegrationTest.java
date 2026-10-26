@@ -30,7 +30,7 @@ class GmailEndpointsIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.syncing").value(false));
         getJson("/api/gmail/connect-url", token)
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message", containsString("GOOGLE_CLIENT_ID")));
+                .andExpect(jsonPath("$.message", containsString("isn't available")));
         postJson("/api/gmail/sync", token, Map.of()).andExpect(status().isNotFound());
         getJson("/api/gmail/events", token).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
     }

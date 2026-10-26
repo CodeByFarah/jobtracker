@@ -12,7 +12,8 @@ public record GmailProperties(String clientId,
                               String redirectUri,
                               String frontendUrl,
                               int initialSyncDays,
-                              int maxMessagesPerSync) {
+                              int maxMessagesPerSync,
+                              int syncWorkers) {
 
     public GmailProperties {
         if (redirectUri == null || redirectUri.isBlank()) {
@@ -27,6 +28,9 @@ public record GmailProperties(String clientId,
         }
         if (maxMessagesPerSync <= 0) {
             maxMessagesPerSync = 500;
+        }
+        if (syncWorkers <= 0) {
+            syncWorkers = 1;
         }
     }
 

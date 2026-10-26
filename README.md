@@ -108,12 +108,48 @@ indexes on `company_id` and `application_id`. The schema is built by the Flyway 
 ## Authentication
 
 - `POST /api/auth/register` and `POST /api/auth/login` return an HS256-signed JWT (`accessToken`) with the user id as the subject. It expires after `JWT_EXPIRATION_MINUTES` (24 hours by default).
-- The client sends `Authorization: Bearer <token>`. Spring Security's resource server verifies the signature, expiry and issuer on every request. There is no server session and no cookie, so CSRF protection isn't needed.
+- The client sends `Authorization: Bearer <token>`. Spring Security's resource server verifies the signature, expiry and issuer on every request. There is no server session and no login cookie, so CSRF protection isn't needed. (The only cookie is a short-lived, `httpOnly` one that ties a Gmail sign-in to the browser that started it; it authorises nothing else.)
 - **Ownership:** the current user id is always taken from the verified token (`CurrentUser`), never from the request. Every repository lookup is scoped by owner (`findByIdAndUserId`, `findByIdAndApplicationUserId`).
 - A resource that belongs to someone else returns **404 Not Found** rather than 403, so the API never confirms that another user's id exists.
 - Login failures return the same `401 Invalid email or password` whether or not the email exists. A dummy BCrypt comparison keeps the timing of the two cases similar.
 - **Logout** happens on the client: the frontend discards the token. JWTs are stateless and there is no server-side revocation list; that's an accepted trade-off for this project's scope.
 - **Known trade-off:** the frontend keeps the token in `localStorage`. An `httpOnly` cookie would protect it better against XSS, but would require CSRF protection.
+- **Deleting an account** (`POST /api/users/me/delete`, Profile page) asks for the password, revokes JobTrack's Gmail access at Google, and removes every job, company, email record and logo of that account.
+
+## Built for many users
+
+JobTrack is a multi-user service: anyone can sign up, and nothing in the code or database is tied to
+one person. A fresh install has no data at all.
+
+- **Complete isolation.** Every job, company, interview, email record and Gmail connection belongs to
+  one account, and every query is scoped to the caller (see *Authentication*). Integration tests
+  check user A against user B on every resource.
+- **One mailbox per account, one account per mailbox.** Both are unique constraints in the database.
+  The connected Gmail is the only source the AI reads for that account. Connecting a different Gmail
+  replaces the old one: JobTrack's access to the old mailbox is revoked and the new one is read from
+  scratch. Jobs found earlier stay (they are the user's applications); disconnecting keeps them too.
+  A mailbox already connected to another account can't be connected again until it is disconnected there.
+- **Safe Gmail sign-in.** The OAuth `state` is signed, expires after 15 minutes, and is only accepted
+  from the browser that started the sign-in (a nonce in an `httpOnly` cookie), so nobody can get their
+  mailbox attached to someone else's account by sharing a link. Refresh tokens are stored encrypted
+  (AES-256-GCM) with `TOKEN_ENCRYPTION_KEY`; only read-only Gmail access is requested.
+- **Sync that scales out.** Each mailbox row carries a sync lease, progress and the last report, so
+  several backend instances can run behind a load balancer without checking a mailbox twice, and any
+  instance can answer "how far is my check?". A check stops as soon as its mailbox is disconnected
+  or replaced. `GMAIL_SYNC_WORKERS` sets how many mailboxes one instance checks at once.
+- **What a public launch still needs** (configuration and process, not code):
+  - **Google verification.** `gmail.readonly` is a *restricted* scope. Until the OAuth app is
+    verified, only listed test users can connect, at most 100. Public use needs Google's app
+    verification and a yearly third-party security assessment (CASA), plus a privacy policy and
+    terms of service on your domain.
+  - **AI capacity.** The AI is the bottleneck: one Ollama instance reads one email at a time. Run
+    Ollama on a GPU server (or several behind `OLLAMA_URL`) and raise `GMAIL_SYNC_WORKERS` to match.
+  - **HTTPS and one origin.** Serve the frontend and `/api` from the same HTTPS domain (a reverse
+    proxy), set `FRONTEND_URL` and `GOOGLE_REDIRECT_URI` to it, and register that redirect URI in
+    Google Cloud.
+  - **Secrets.** Set long random `JWT_SECRET` and `TOKEN_ENCRYPTION_KEY` values and keep them stable;
+    changing the encryption key means every user has to reconnect Gmail.
+  - **Abuse limits.** Put rate limiting for `/api/auth/*` in the reverse proxy or API gateway.
 
 ## Business logic highlights
 
@@ -178,9 +214,9 @@ How it fits together (`backend/src/main/java/com/jobtrack`):
 | `ai` | `OllamaClient` (JSON-schema constrained answers), `JobPostingParser` (schema.org data), `JobLinkImportService` |
 | `gmail` | OAuth (`GmailConnectionService`, signed `OAuthStateSigner`, AES-GCM `TokenCipher` for the stored refresh token), `GmailApiClient` (plain REST, no Google SDK), `CompanyMatcher` pre-filter, `EmailClassifier`, `EmailStatusRules`, `EmailSyncService` + scheduler |
 
-Emails are processed oldest-first on a single background worker (the local model handles one request
-at a time). Each processed message id is stored, so nothing is read twice, and a failed sync doesn't
-move the "read up to" mark, so it is retried. Expect roughly 10–25 seconds per job-related email on a
+Emails are processed newest-first on a background worker pool (`GMAIL_SYNC_WORKERS`, default 1, since
+a local model handles one request at a time). Each processed message id is stored, so nothing is read
+twice, and a failed sync doesn't move the "read up to" mark, so it is retried. Expect roughly 10–25 seconds per job-related email on a
 laptop CPU; unrelated emails are skipped before they reach the AI.
 
 ### Setting up the local AI
@@ -234,7 +270,7 @@ No local database or configuration is needed.
 | Unit tests (JUnit 5 + Mockito) | Status transitions and history, application creation and update, validation rules, ownership (not-found for foreign ids), company creation, duplicate names and deletion rules, interview date rules, email status rules and the update summary, dashboard calculations (zero-filling, time zones), registration and login. |
 | Integration tests (`@SpringBootTest` + MockMvc + Testcontainers) | The full acceptance workflow (register → … → dashboard → search). User A vs. user B on every resource type. Page size, page number and filters combined with pagination. Sorting. Validation and error bodies. Transaction rollback when the history insert fails. |
 
-145 tests; all pass (plus the opt-in live tests: real AI with `-Dollama.live=true`, real company logos with `-Dlogos.live=true`).
+153 tests; all pass (plus the opt-in live tests: real AI with `-Dollama.live=true`, real company logos with `-Dlogos.live=true`).
 
 ## Setup
 
@@ -297,6 +333,11 @@ origin to `CORS_ALLOWED_ORIGINS`.
 | `JWT_SECRET` | yes | HMAC signing key, **at least 32 bytes**; startup fails if it is missing or too short |
 | `JWT_EXPIRATION_MINUTES` | no | Token lifetime, default `1440` (24 h) |
 | `CORS_ALLOWED_ORIGINS` | no | Comma-separated origins allowed to call the API, default `http://localhost:5173` |
+| `OLLAMA_URL` / `OLLAMA_MODEL` | no | AI server and model, default `http://localhost:11434` / `qwen3:4b-instruct-2507-q4_K_M` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | for Gmail | OAuth client from Google Cloud; Gmail tracking is off without them |
+| `GOOGLE_REDIRECT_URI` / `FRONTEND_URL` | in production | Public callback URL and app URL, default the local Vite server |
+| `TOKEN_ENCRYPTION_KEY` | in production | Encrypts stored Gmail access; defaults to a key derived from `JWT_SECRET` |
+| `GMAIL_SYNC_INTERVAL` / `GMAIL_SYNC_WORKERS` | no | Automatic check interval (default `PT30M`) and parallel checks per instance (default 1) |
 
 ## API documentation
 

@@ -1,6 +1,8 @@
 package com.jobtrack.gmail;
 
 import com.jobtrack.config.JwtProperties;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -14,9 +16,11 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
- * Encrypts Gmail refresh tokens at rest with AES-256-GCM. The key is derived from JWT_SECRET,
- * so a database dump alone can't be used to read someone's mail. Changing JWT_SECRET makes the
- * stored tokens unreadable; users then simply reconnect Gmail.
+ * Encrypts Gmail refresh tokens at rest with AES-256-GCM, so a database dump alone can't be used
+ * to read anyone's mail. The key comes from TOKEN_ENCRYPTION_KEY, or from JWT_SECRET when that
+ * isn't set. In production set its own key, so the login secret can be rotated without
+ * disconnecting every mailbox. Changing the key makes stored tokens unreadable; users then
+ * reconnect Gmail.
  */
 @Component
 public class TokenCipher {
@@ -27,8 +31,15 @@ public class TokenCipher {
     private final SecretKeySpec key;
     private final SecureRandom random = new SecureRandom();
 
+    @Autowired
+    public TokenCipher(JwtProperties jwtProperties,
+                       @Value("${jobtrack.gmail.token-encryption-key:}") String encryptionKey) {
+        String secret = encryptionKey == null || encryptionKey.isBlank() ? jwtProperties.secret() : encryptionKey;
+        this.key = new SecretKeySpec(sha256("jobtrack-gmail-token:" + secret), "AES");
+    }
+
     public TokenCipher(JwtProperties jwtProperties) {
-        this.key = new SecretKeySpec(sha256("jobtrack-gmail-token:" + jwtProperties.secret()), "AES");
+        this(jwtProperties, null);
     }
 
     public String encrypt(String plainText) {

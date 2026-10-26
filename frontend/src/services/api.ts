@@ -29,6 +29,7 @@ export const userApi = {
   me: () => http.get<User>('/api/users/me'),
   update: (body: { fullName: string; headline: string | null; location: string | null }) =>
     http.put<User>('/api/users/me', body),
+  deleteAccount: (password: string) => http.post<void>('/api/users/me/delete', { password }),
 }
 
 export const companyApi = {

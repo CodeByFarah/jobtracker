@@ -69,6 +69,63 @@ export function ProfilePage() {
         </form>
       </section>
       <GmailCard />
+      <DeleteAccountCard />
     </>
+  )
+}
+
+/** Permanently removes the account and all its data. Asks for the password first. */
+function DeleteAccountCard() {
+  const { logout } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const { submitting, formError, fieldErrors, run } = useSubmit()
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    run(async () => {
+      await userApi.deleteAccount(password)
+      logout()
+    })
+  }
+
+  return (
+    <section className="card narrow-card" aria-labelledby="delete-account-heading">
+      <header className="section-header">
+        <h2 id="delete-account-heading">Delete account</h2>
+      </header>
+      <p className="muted gmail-intro">
+        Deletes your account, every job and company in it, and disconnects Gmail. This can't be undone.
+      </p>
+      {open ? (
+        <form className="form" onSubmit={submit} noValidate>
+          {formError && <p className="form-error" role="alert">{formError}</p>}
+          <FormField label="Password" required error={fieldErrors.password} hint="Enter your password to confirm.">
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoFocus
+            />
+          </FormField>
+          <div className="form-actions">
+            <button type="submit" className="button button-danger" disabled={submitting || !password}>
+              {submitting ? 'Deleting…' : 'Delete my account'}
+            </button>
+            <button type="button" className="button button-ghost" onClick={() => setOpen(false)} disabled={submitting}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="form-actions">
+          <button type="button" className="button button-ghost-danger" onClick={() => setOpen(true)}>
+            Delete account…
+          </button>
+        </div>
+      )}
+    </section>
   )
 }

@@ -20,8 +20,11 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,6 +35,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -39,6 +43,8 @@ import java.util.List;
 public class GmailController {
 
     private static final Logger log = LoggerFactory.getLogger(GmailController.class);
+    private static final String CALLBACK_PATH = "/api/gmail/oauth/callback";
+    private static final String OAUTH_COOKIE = "jobtrack_gmail_oauth";
 
     private final GmailConnectionService connectionService;
     private final EmailSyncService syncService;
@@ -64,8 +70,18 @@ public class GmailController {
     @GetMapping("/api/gmail/connect-url")
     @Operation(summary = "Google sign-in URL", description = "Send the browser here to connect Gmail (read-only access).")
     @ApiResponse(responseCode = "409", description = "Google OAuth credentials are not configured on the server")
-    public ConnectUrlResponse connectUrl() {
-        return new ConnectUrlResponse(connectionService.connectUrl(currentUser.id()));
+    public ResponseEntity<ConnectUrlResponse> connectUrl() {
+        GmailConnectionService.ConnectStart start = connectionService.connectUrl(currentUser.id());
+        // Ties the sign-in to this browser: the callback only accepts it together with this cookie.
+        ResponseCookie cookie = ResponseCookie.from(OAUTH_COOKIE, start.browserNonce())
+                .httpOnly(true)
+                .secure(properties.redirectUri().startsWith("https://"))
+                .sameSite("Lax")
+                .path(CALLBACK_PATH)
+                .maxAge(Duration.ofMinutes(15))
+                .build();
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new ConnectUrlResponse(start.url()));
     }
 
     /**
@@ -73,18 +89,19 @@ public class GmailController {
      * the signed {@code state} identifies the user. Always redirects to the frontend's /gmail/done
      * page, which hands the result to the JobTrack tab that opened the sign-in popup.
      */
-    @GetMapping("/api/gmail/oauth/callback")
+    @GetMapping(CALLBACK_PATH)
     @Operation(summary = "OAuth callback (called by Google)")
     public ResponseEntity<Void> oauthCallback(@RequestParam(required = false) String code,
                                               @RequestParam(required = false) String state,
-                                              @RequestParam(required = false) String error) {
+                                              @RequestParam(required = false) String error,
+                                              @CookieValue(name = OAUTH_COOKIE, required = false) String browserNonce) {
         UriComponentsBuilder target = UriComponentsBuilder.fromUriString(properties.frontendUrl() + "/gmail/done");
         if (error != null || code == null || state == null) {
             target.queryParam("gmail", "error")
                     .queryParam("reason", error != null ? "Google sign-in was cancelled." : "Google sent an incomplete response.");
         } else {
             try {
-                long userId = connectionService.completeConnection(code, state);
+                long userId = connectionService.completeConnection(code, state, browserNonce);
                 syncService.requestSync(userId);
                 target.queryParam("gmail", "connected");
             } catch (BadRequestException | GmailAuthException e) {
@@ -95,7 +112,9 @@ public class GmailController {
             }
         }
         URI location = target.encode().build().toUri();
-        return ResponseEntity.status(HttpStatus.FOUND).location(location).build();
+        ResponseCookie clear = ResponseCookie.from(OAUTH_COOKIE, "").path(CALLBACK_PATH).maxAge(0).build();
+        return ResponseEntity.status(HttpStatus.FOUND).location(location)
+                .header(HttpHeaders.SET_COOKIE, clear.toString()).build();
     }
 
     @PostMapping("/api/gmail/sync")
@@ -143,16 +162,16 @@ public class GmailController {
 
     private GmailStatusResponse statusFor(Long userId) {
         GmailConnection connection = connectionService.find(userId).orElse(null);
-        int[] progress = syncService.progress(userId);
+        EmailSyncService.State sync = syncService.state(userId);
         return new GmailStatusResponse(
                 connectionService.isConfigured(),
                 connection != null,
                 connection == null ? null : connection.getGmailAddress(),
                 connection == null ? null : connection.getLastSyncedAt(),
                 connection == null ? null : connection.getLastSyncError(),
-                syncService.isSyncing(userId),
-                progress[0],
-                progress[1],
-                syncService.lastRun(userId).orElse(null));
+                sync.syncing(),
+                sync.done(),
+                sync.total(),
+                sync.lastRun());
     }
 }

@@ -57,7 +57,7 @@ export function DashboardPage() {
         <EmptyState
           icon="briefcase"
           title="Your dashboard fills in as you go"
-          text="Paste the link to a job you’ve applied for (or want to) and your local AI fills in the details. Statistics, charts and email updates will appear here."
+          text="Paste the link to a job you’ve applied for (or want to) and the AI fills in the details. Statistics, charts and email updates will appear here."
           action={
             <button type="button" className="button button-primary" onClick={add.fromLink}>
               <Icon name="plus" /> Add a new application

@@ -116,7 +116,7 @@ export function ApplicationsPage() {
           <EmptyState
             icon="briefcase"
             title="No applications yet"
-            text="Paste a job link and your local AI fills in the details, or connect Gmail and they’re found for you."
+            text="Paste a job link and the AI fills in the details, or connect Gmail and they’re found for you."
             action={
               <button type="button" className="button button-primary" onClick={add.fromLink}>
                 <Icon name="plus" /> Add a new application

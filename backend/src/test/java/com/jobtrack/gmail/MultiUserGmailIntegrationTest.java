@@ -5,14 +5,16 @@ import com.jobtrack.entity.EmailCategory;
 import com.jobtrack.repository.GmailConnectionRepository;
 import com.jobtrack.repository.JobApplicationRepository;
 import com.jobtrack.support.IntegrationTestSupport;
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * JobTrack as a multi-user product: one mailbox per account, one account per mailbox, sign-ins
- * bound to the browser that started them, switching mailboxes, checks that stop when a mailbox is
+ * that only connect the account that started them, switching mailboxes, checks that stop when a mailbox is
  * disconnected, a sync lease shared by all server instances, and deleting an account.
  */
 @TestPropertySource(properties = {"GOOGLE_CLIENT_ID=test-client", "GOOGLE_CLIENT_SECRET=test-secret"})
@@ -65,18 +67,25 @@ class MultiUserGmailIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void theSignInOnlyCompletesInTheBrowserThatStartedIt() throws Exception {
-        String token = registerUser();
-        SignIn signIn = startSignIn(token, "c1", mailbox());
+    void aSignInOnlyConnectsTheAccountThatStartedIt() throws Exception {
+        String attacker = registerUser();
+        String victim = registerUser();
+        SignIn attackersLink = startSignIn(attacker, "c1", mailbox());
 
-        // Someone else's browser (no cookie) opening the same Google link connects nothing.
-        String withoutCookie = mockMvc.perform(get(CALLBACK).param("code", "c1").param("state", signIn.state()))
-                .andReturn().getResponse().getHeader("Location");
-        assertThat(withoutCookie).contains("gmail=error");
-        assertThat(connectionService.find(userId(token))).isEmpty();
+        // The attacker's Google link, completed by someone else logged in to their own account.
+        String result = finish(new SignIn(attackersLink.state(), victim, attackersLink.code()));
 
-        assertThat(finish(signIn)).contains("gmail=connected");
-        assertThat(connectionService.find(userId(token))).isPresent();
+        assertThat(result).contains("gmail=error").contains("different JobTrack account");
+        assertThat(connectionService.find(userId(attacker))).isEmpty();
+        assertThat(connectionService.find(userId(victim))).isEmpty();
+        verify(gmail, never()).exchangeCode("c1"); // the Google code was never even used
+
+        // Not logged in at all: rejected too.
+        postJson("/api/gmail/complete", null, Map.of("code", "c1", "state", attackersLink.state()))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(finish(attackersLink)).contains("gmail=connected");
+        assertThat(connectionService.find(userId(attacker))).isPresent();
     }
 
     @Test
@@ -192,7 +201,7 @@ class MultiUserGmailIntegrationTest extends IntegrationTestSupport {
 
     // --- helpers ---------------------------------------------------------------------------
 
-    private record SignIn(String state, Cookie cookie, String code) {
+    private record SignIn(String state, String token, String code) {
     }
 
     private SignIn startSignIn(String token, String code, String address) throws Exception {
@@ -200,17 +209,28 @@ class MultiUserGmailIntegrationTest extends IntegrationTestSupport {
         when(gmail.emailAddress("access-" + code)).thenReturn(address);
         MvcResult result = getJson("/api/gmail/connect-url", token).andExpect(status().isOk()).andReturn();
         String url = jsonMapper.readTree(result.getResponse().getContentAsString()).get("url").asString();
-        Cookie cookie = result.getResponse().getCookie("jobtrack_gmail_oauth");
-        assertThat(cookie).isNotNull();
-        assertThat(cookie.isHttpOnly()).isTrue();
-        return new SignIn(url.substring(url.indexOf("state=") + 6), cookie, code);
+        return new SignIn(url.substring(url.indexOf("state=") + 6), token, code);
     }
 
+    /**
+     * Google -> backend callback -> frontend /gmail/done, which posts the code and state as the
+     * logged-in user. Returns "gmail=connected" or "gmail=error: <message>".
+     */
     private String finish(SignIn signIn) throws Exception {
-        return mockMvc.perform(get(CALLBACK).param("code", signIn.code()).param("state", signIn.state())
-                        .cookie(signIn.cookie()))
+        String location = mockMvc.perform(get(CALLBACK).param("code", signIn.code()).param("state", signIn.state()))
                 .andExpect(status().isFound())
                 .andReturn().getResponse().getHeader("Location");
+        Map<String, String> query = UriComponentsBuilder.fromUriString(location).build().getQueryParams().toSingleValueMap();
+        assertThat(location).contains("/gmail/done");
+        MvcResult completed = postJson("/api/gmail/complete", signIn.token(),
+                Map.of("code", decode(query.get("code")), "state", decode(query.get("state")))).andReturn();
+        return completed.getResponse().getStatus() == 200
+                ? "gmail=connected"
+                : "gmail=error: " + jsonMapper.readTree(completed.getResponse().getContentAsString()).get("message").asString();
+    }
+
+    private static String decode(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     private long userId(String token) throws Exception {

@@ -62,27 +62,25 @@ public class GmailConnectionService {
         return properties.configured();
     }
 
-    /** The Google sign-in URL, and the nonce the browser must bring back to the callback. */
-    public ConnectStart connectUrl(Long userId) {
+    /** The Google sign-in URL for this user. */
+    public String connectUrl(Long userId) {
         if (!properties.configured()) {
             log.warn("Gmail connect requested but GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set");
             throw new ConflictException("Connecting Gmail isn't available right now. Please try again later.");
         }
-        OAuthStateSigner.State state = stateSigner.create(userId);
-        return new ConnectStart(gmail.authorizationUrl(state.value()), state.browserNonce());
-    }
-
-    public record ConnectStart(String url, String browserNonce) {
+        return gmail.authorizationUrl(stateSigner.create(userId));
     }
 
     /**
-     * Finishes the Google sign-in: checks the state (and that this browser started it), swaps the
-     * code for tokens and stores the encrypted refresh token. Returns the user id the mailbox was
-     * connected to.
+     * Finishes the Google sign-in for the logged-in user: the state must be genuine and made for
+     * this same user. Swaps the code for tokens and stores the encrypted refresh token.
      */
     @Transactional
-    public long completeConnection(String code, String state, String browserNonce) {
-        long userId = stateSigner.verify(state, browserNonce);
+    public void completeConnection(long userId, String code, String state) {
+        if (stateSigner.verify(state) != userId) {
+            throw new GmailAuthException("This Gmail sign-in was started from a different JobTrack account. "
+                    + "Log in to your own account and connect Gmail from there.");
+        }
         GmailApiClient.Tokens tokens = gmail.exchangeCode(code);
         if (tokens.refreshToken() == null) {
             throw new GmailAuthException("Google didn't grant offline access. Remove JobTrack under "
@@ -119,7 +117,6 @@ public class GmailConnectionService {
             throw new GmailAuthException(ALREADY_CONNECTED_ELSEWHERE);
         }
         accessTokens.put(connection.getId(), new CachedToken(tokens.accessToken(), expiry(tokens)));
-        return userId;
     }
 
     @Transactional(readOnly = true)

@@ -19,10 +19,9 @@ import java.util.Base64;
  * carries the user id, an expiry and a random nonce, signed with HMAC-SHA256. A forged or expired
  * state is rejected.
  * <p>
- * The nonce is also given to the browser that started the sign-in (as a cookie), and the callback
- * only accepts the state together with that cookie. Otherwise someone could start a sign-in on their
- * own account, send the Google link to another person, and have that person's mailbox connected
- * to the attacker's account.
+ * The state alone doesn't connect anything: the sign-in is finished by the logged-in JobTrack app
+ * ({@code POST /api/gmail/complete}), which must be the same user the state was made for. So a
+ * Google link sent to someone else can never attach their mailbox to the sender's account.
  */
 @Component
 public class OAuthStateSigner {
@@ -35,27 +34,22 @@ public class OAuthStateSigner {
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
-    /** The signed state for Google, and the nonce the starting browser must present at the callback. */
-    public record State(String value, String browserNonce) {
-    }
 
     public OAuthStateSigner(JwtProperties jwtProperties, Clock clock) {
         this.key = TokenCipher.sha256("jobtrack-gmail-oauth-state:" + jwtProperties.secret());
         this.clock = clock;
     }
 
-    public State create(long userId) {
+    public String create(long userId) {
         byte[] nonce = new byte[16];
         random.nextBytes(nonce);
-        String browserNonce = ENCODER.encodeToString(nonce);
         long expiresAt = clock.instant().plus(VALIDITY).getEpochSecond();
-        String payload = userId + "." + expiresAt + "." + browserNonce;
-        String value = ENCODER.encodeToString(payload.getBytes(StandardCharsets.UTF_8)) + "." + ENCODER.encodeToString(sign(payload));
-        return new State(value, browserNonce);
+        String payload = userId + "." + expiresAt + "." + ENCODER.encodeToString(nonce);
+        return ENCODER.encodeToString(payload.getBytes(StandardCharsets.UTF_8)) + "." + ENCODER.encodeToString(sign(payload));
     }
 
-    /** Returns the user id the state was created for, if it is genuine, unexpired and from this browser. */
-    public long verify(String state, String browserNonce) {
+    /** Returns the user id the state was created for, if it is genuine and unexpired. */
+    public long verify(String state) {
         try {
             String[] parts = state.split("\\.");
             if (parts.length != 2) {
@@ -69,10 +63,7 @@ public class OAuthStateSigner {
             if (fields.length != 3 || Long.parseLong(fields[1]) < clock.instant().getEpochSecond()) {
                 throw invalid();
             }
-            if (browserNonce == null || !MessageDigest.isEqual(
-                    fields[2].getBytes(StandardCharsets.UTF_8), browserNonce.getBytes(StandardCharsets.UTF_8))) {
-                throw new BadRequestException(null, "Please start connecting Gmail from JobTrack in this browser.");
-            }
+
             return Long.parseLong(fields[0]);
         } catch (IllegalArgumentException e) { // bad Base64 or number
             throw invalid();

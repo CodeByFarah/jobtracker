@@ -108,7 +108,7 @@ indexes on `company_id` and `application_id`. The schema is built by the Flyway 
 ## Authentication
 
 - `POST /api/auth/register` and `POST /api/auth/login` return an HS256-signed JWT (`accessToken`) with the user id as the subject. It expires after `JWT_EXPIRATION_MINUTES` (24 hours by default).
-- The client sends `Authorization: Bearer <token>`. Spring Security's resource server verifies the signature, expiry and issuer on every request. There is no server session and no login cookie, so CSRF protection isn't needed. (The only cookie is a short-lived, `httpOnly` one that ties a Gmail sign-in to the browser that started it; it authorises nothing else.)
+- The client sends `Authorization: Bearer <token>`. Spring Security's resource server verifies the signature, expiry and issuer on every request. There is no server session and no cookie, so CSRF protection isn't needed.
 - **Ownership:** the current user id is always taken from the verified token (`CurrentUser`), never from the request. Every repository lookup is scoped by owner (`findByIdAndUserId`, `findByIdAndApplicationUserId`).
 - A resource that belongs to someone else returns **404 Not Found** rather than 403, so the API never confirms that another user's id exists.
 - Login failures return the same `401 Invalid email or password` whether or not the email exists. A dummy BCrypt comparison keeps the timing of the two cases similar.
@@ -129,9 +129,10 @@ one person. A fresh install has no data at all.
   replaces the old one: JobTrack's access to the old mailbox is revoked and the new one is read from
   scratch. Jobs found earlier stay (they are the user's applications); disconnecting keeps them too.
   A mailbox already connected to another account can't be connected again until it is disconnected there.
-- **Safe Gmail sign-in.** The OAuth `state` is signed, expires after 15 minutes, and is only accepted
-  from the browser that started the sign-in (a nonce in an `httpOnly` cookie), so nobody can get their
-  mailbox attached to someone else's account by sharing a link. Refresh tokens are stored encrypted
+- **Safe Gmail sign-in.** The OAuth `state` is signed and expires after 15 minutes. Google's callback
+  connects nothing by itself: the app finishes the sign-in (`POST /api/gmail/complete`) as the
+  logged-in user, who must be the one that started it. So nobody can get a mailbox attached to the
+  wrong account by sharing a link, and it works when the website and the API are on different domains. Refresh tokens are stored encrypted
   (AES-256-GCM) with `TOKEN_ENCRYPTION_KEY`; only read-only Gmail access is requested.
 - **Sync that scales out.** Each mailbox row carries a sync lease, progress and the last report, so
   several backend instances can run behind a load balancer without checking a mailbox twice, and any
@@ -144,9 +145,9 @@ one person. A fresh install has no data at all.
     terms of service on your domain.
   - **AI capacity.** The AI is the bottleneck: one Ollama instance reads one email at a time. Run
     Ollama on a GPU server (or several behind `OLLAMA_URL`) and raise `GMAIL_SYNC_WORKERS` to match.
-  - **HTTPS and one origin.** Serve the frontend and `/api` from the same HTTPS domain (a reverse
-    proxy), set `FRONTEND_URL` and `GOOGLE_REDIRECT_URI` to it, and register that redirect URI in
-    Google Cloud.
+  - **HTTPS.** Set `FRONTEND_URL` to the website's address, `GOOGLE_REDIRECT_URI` to
+    `https://<api host>/api/gmail/oauth/callback`, `CORS_ALLOWED_ORIGINS` to the website's origin,
+    and register that redirect URI in Google Cloud.
   - **Secrets.** Set long random `JWT_SECRET` and `TOKEN_ENCRYPTION_KEY` values and keep them stable;
     changing the encryption key means every user has to reconnect Gmail.
   - **Abuse limits.** Put rate limiting for `/api/auth/*` in the reverse proxy or API gateway.
@@ -270,7 +271,7 @@ No local database or configuration is needed.
 | Unit tests (JUnit 5 + Mockito) | Status transitions and history, application creation and update, validation rules, ownership (not-found for foreign ids), company creation, duplicate names and deletion rules, interview date rules, email status rules and the update summary, dashboard calculations (zero-filling, time zones), registration and login. |
 | Integration tests (`@SpringBootTest` + MockMvc + Testcontainers) | The full acceptance workflow (register → … → dashboard → search). User A vs. user B on every resource type. Page size, page number and filters combined with pagination. Sorting. Validation and error bodies. Transaction rollback when the history insert fails. |
 
-153 tests; all pass (plus the opt-in live tests: real AI with `-Dollama.live=true`, real company logos with `-Dlogos.live=true`).
+152 tests; all pass (plus the opt-in live tests: real AI with `-Dollama.live=true`, real company logos with `-Dlogos.live=true`).
 
 ## Setup
 

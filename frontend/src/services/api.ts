@@ -75,6 +75,8 @@ export const applicationApi = {
 export const gmailApi = {
   status: () => http.get<GmailStatus>('/api/gmail'),
   connectUrl: () => http.get<{ url: string }>('/api/gmail/connect-url'),
+  /** Finishes a Google sign-in as the logged-in user. */
+  complete: (code: string, state: string) => http.post<GmailStatus>('/api/gmail/complete', { code, state }),
   sync: () => http.post<GmailStatus>('/api/gmail/sync'),
   disconnect: () => http.delete('/api/gmail'),
   events: (limit = 20) => http.get<EmailEvent[]>(`/api/gmail/events${buildQuery({ limit })}`),

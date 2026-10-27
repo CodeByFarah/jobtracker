@@ -40,10 +40,14 @@ class GmailEndpointsIntegrationTest extends IntegrationTestSupport {
         getJson("/api/gmail", null).andExpect(status().isUnauthorized());
         postJson("/api/applications/import-link", null, Map.of("url", "https://example.com")).andExpect(status().isUnauthorized());
 
-        // A forged state never connects anything; the browser is sent back to the profile page with an error.
-        mockMvc.perform(get("/api/gmail/oauth/callback").param("code", "abc").param("state", "forged"))
+        // The callback connects nothing by itself: it hands the result to the frontend, which must
+        // finish as the logged-in user who started the sign-in.
+        mockMvc.perform(get("/api/gmail/oauth/callback").param("error", "access_denied"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", containsString("/gmail/done?gmail=error")));
+        postJson("/api/gmail/complete", null, Map.of("code", "abc", "state", "forged")).andExpect(status().isUnauthorized());
+        postJson("/api/gmail/complete", registerUser(), Map.of("code", "abc", "state", "forged"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

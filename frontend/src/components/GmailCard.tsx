@@ -100,8 +100,7 @@ export function GmailCard() {
 
       {data && !data.configured && (
         <p className="notice">
-          Gmail isn’t set up on this server yet. Add <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code>{' '}
-          to the <code>.env</code> file and restart the backend (see the README).
+          Connecting Gmail isn’t available right now. Please try again later.
         </p>
       )}
 

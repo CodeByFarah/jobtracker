@@ -17,7 +17,7 @@ import { RegisterPage } from './pages/RegisterPage'
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
         <Routes>
           <Route path="/gmail/done" element={<GmailDonePage />} />
           <Route element={<PublicOnly />}>

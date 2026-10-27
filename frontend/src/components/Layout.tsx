@@ -23,7 +23,7 @@ export function Layout() {
       <header className={`globalnav ${menuOpen ? 'globalnav-open' : ''}`}>
         <div className="globalnav-inner">
           <NavLink to="/dashboard" className="brand" aria-label="JobTrack home">
-            <img src="/favicon.svg" alt="" width={20} height={20} />
+            <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={20} height={20} />
             <span>JobTrack</span>
           </NavLink>
 

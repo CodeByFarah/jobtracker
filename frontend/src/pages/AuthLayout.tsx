@@ -5,7 +5,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <img className="auth-logo" src="/favicon.svg" alt="JobTrack" width={44} height={44} />
+        <img className="auth-logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="JobTrack" width={44} height={44} />
         <h1>{title}</h1>
         <p className="auth-subtitle">{subtitle}</p>
         {children}

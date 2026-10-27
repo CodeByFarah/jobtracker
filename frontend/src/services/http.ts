@@ -74,7 +74,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new ApiError(0, 'Cannot reach the server. Check that the backend is running and try again.')
+    throw new ApiError(0, 'Can’t reach JobTrack right now. If it hasn’t been used for a while it may be starting up; please try again in a minute.')
   }
 
   if (response.status === 204) {

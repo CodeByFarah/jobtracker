@@ -9,6 +9,9 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
         <h1>{title}</h1>
         <p className="auth-subtitle">{subtitle}</p>
         {children}
+        <p className="auth-subtitle" style={{ marginTop: 24, fontSize: 13 }}>
+          <a href={`${import.meta.env.BASE_URL}privacy.html`}>Privacy Policy</a>
+        </p>
       </div>
     </div>
   )

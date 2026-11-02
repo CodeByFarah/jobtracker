@@ -3,6 +3,8 @@ package com.jobtrack.gmail;
 import com.jobtrack.config.GmailProperties;
 import com.jobtrack.exception.GmailAuthException;
 import org.jsoup.Jsoup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -32,6 +34,8 @@ import java.util.Map;
  */
 @Component
 public class GmailApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(GmailApiClient.class);
 
     public static final String SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
     private static final String AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -190,6 +194,8 @@ public class GmailApiClient {
                     .body(String.class);
             return jsonMapper.readTree(body == null ? "{}" : body);
         } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
+            log.warn("Gmail API {} answered {}: {}", uri.getPath(), e.getStatusCode().value(),
+                    e.getResponseBodyAsString().replaceAll("\\s+", " "));
             throw new GmailAuthException("Gmail refused access. Please reconnect Gmail.", e);
         }
     }

@@ -186,17 +186,49 @@ public class GmailApiClient {
         }
     }
 
+    /** How long to wait before each retry when Gmail says "too many requests" (about 2 minutes in all). */
+    private static final long[] RATE_LIMIT_WAITS_MS = {2_000, 5_000, 10_000, 20_000, 30_000, 60_000};
+
     private JsonNode get(String accessToken, URI uri) {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                String body = restClient.get().uri(uri)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                        .retrieve()
+                        .body(String.class);
+                return jsonMapper.readTree(body == null ? "{}" : body);
+            } catch (HttpClientErrorException e) {
+                String response = e.getResponseBodyAsString();
+                // Gmail reports its per-minute limit as 429, or as 403 with a rate-limit reason.
+                // That isn't a permission problem: slow down and try again.
+                if (isRateLimit(e.getStatusCode().value(), response)) {
+                    if (attempt < RATE_LIMIT_WAITS_MS.length) {
+                        pause(RATE_LIMIT_WAITS_MS[attempt]);
+                        continue;
+                    }
+                    throw new GmailAuthException("Gmail is busy right now. Please try the check again in a few minutes.", e);
+                }
+                if (e instanceof HttpClientErrorException.Unauthorized || e instanceof HttpClientErrorException.Forbidden) {
+                    log.warn("Gmail API {} answered {}: {}", uri.getPath(), e.getStatusCode().value(),
+                            response.replaceAll("\\s+", " "));
+                    throw new GmailAuthException("Gmail refused access. Please reconnect Gmail.", e);
+                }
+                throw e;
+            }
+        }
+    }
+
+    static boolean isRateLimit(int status, String response) {
+        return status == 429 || (status == 403 && (response.contains("rateLimitExceeded")
+                || response.contains("userRateLimitExceeded") || response.contains("RATE_LIMIT_EXCEEDED")));
+    }
+
+    private static void pause(long millis) {
         try {
-            String body = restClient.get().uri(uri)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .retrieve()
-                    .body(String.class);
-            return jsonMapper.readTree(body == null ? "{}" : body);
-        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
-            log.warn("Gmail API {} answered {}: {}", uri.getPath(), e.getStatusCode().value(),
-                    e.getResponseBodyAsString().replaceAll("\\s+", " "));
-            throw new GmailAuthException("Gmail refused access. Please reconnect Gmail.", e);
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for Gmail", e);
         }
     }
 

@@ -232,7 +232,8 @@ laptop CPU; unrelated emails are skipped before they reach the AI.
 For a server without a local model, set `AI_PROVIDER=openai` and `AI_API_KEY`. Any service with an
 OpenAI-compatible chat API works; the default is [Groq](https://groq.com) with `openai/gpt-oss-20b`
 (a few cents for a first Gmail check). Pick another with `AI_API_URL` and `AI_MODEL`, for example
-`https://api.openai.com/v1`. The prompts, the JSON schemas and every rule stay the same; only where
+`https://api.openai.com/v1`, or `https://api.deepseek.com` with `deepseek-chat` (services that don't
+accept a JSON schema, like DeepSeek, are switched to plain JSON mode automatically). The prompts, the JSON schemas and every rule stay the same; only where
 the model runs changes. Use a paid key whose terms don't train on your data: these are people's emails.
 
 ### Setting up Gmail (one-time, ~10 minutes)

@@ -73,6 +73,32 @@ class OllamaClientOnlineTest {
     }
 
     @Test
+    void fallsBackToPlainJsonModeWhenTheServiceRefusesASchema() {
+        server.removeContext("/v1/chat/completions");
+        server.createContext("/v1/chat/completions", exchange -> {
+            String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            lastBody.set(request);
+            boolean schemaMode = request.contains("json_schema");
+            byte[] out = (schemaMode
+                    ? "{\"error\":{\"message\":\"This response_format type is unavailable now\"}}"
+                    : "{\"choices\":[{\"message\":{\"content\":\"{\\\"category\\\":\\\"OFFER\\\"}\"}}]}")
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(schemaMode ? 400 : 200, out.length);
+            exchange.getResponseBody().write(out);
+            exchange.close();
+        });
+        OllamaClient client = client("key");
+
+        assertThat(client.chatForJson("system text", "user text", SCHEMA).path("category").asString(""))
+                .isEqualTo("OFFER");
+        assertThat(lastBody.get()).contains("json_object").contains("matching this JSON schema");
+        // Remembered: the next call goes straight to plain JSON mode.
+        lastBody.set(null);
+        client.chatForJson("s", "u", SCHEMA);
+        assertThat(lastBody.get()).doesNotContain("json_schema");
+    }
+
+    @Test
     void acceptsAnswersWrappedInCodeFences() {
         assertThat(OllamaClient.stripCodeFence("```json\n{\"a\":1}\n```")).isEqualTo("{\"a\":1}");
         assertThat(OllamaClient.stripCodeFence("{\"a\":1}")).isEqualTo("{\"a\":1}");

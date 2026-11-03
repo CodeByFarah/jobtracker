@@ -33,6 +33,8 @@ public class OllamaClient {
     private final RestClient restClient;
     private final JsonMapper jsonMapper;
     private final AiProperties properties;
+    /** Set once the service has refused a JSON schema; from then on plain JSON mode is used. */
+    private volatile boolean plainJsonMode;
 
     public OllamaClient(AiProperties properties, JsonMapper jsonMapper) {
         this.properties = properties;
@@ -95,13 +97,7 @@ public class OllamaClient {
         if (properties.apiKey().isBlank()) {
             throw new AiUnavailableException("The AI service isn't set up yet (no API key).", null);
         }
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", properties.model());
-        body.put("temperature", 0);
-        body.put("messages", messages);
-        body.put("response_format", Map.of("type", "json_schema",
-                "json_schema", Map.of("name", "answer", "schema", schema, "strict", false)));
-        String json = jsonMapper.writeValueAsString(body);
+        String json = jsonMapper.writeValueAsString(onlineBody(messages, schema, !plainJsonMode));
 
         for (int attempt = 0; ; attempt++) {
             try {
@@ -119,6 +115,17 @@ public class OllamaClient {
                     continue;
                 }
                 throw new AiUnavailableException("The AI service is busy right now. Please try again in a few minutes.", e);
+            } catch (HttpClientErrorException.BadRequest e) {
+                // Some services (DeepSeek, for one) don't accept a JSON schema in response_format.
+                // Fall back to plain JSON mode with the schema written into the instructions.
+                if (!plainJsonMode) {
+                    plainJsonMode = true;
+                    json = jsonMapper.writeValueAsString(onlineBody(messages, schema, false));
+                    attempt--;
+                    continue;
+                }
+                throw new AiUnavailableException("The AI service refused the request: "
+                        + e.getResponseBodyAsString(), e);
             } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
                 throw new AiUnavailableException("The AI service rejected the API key.", e);
             } catch (RestClientException e) {
@@ -128,6 +135,26 @@ public class OllamaClient {
                 throw new AiUnavailableException("The AI model returned an answer that couldn't be read", e);
             }
         }
+    }
+
+    private Map<String, Object> onlineBody(List<Map<String, String>> messages, Map<String, Object> schema,
+                                           boolean withSchema) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", properties.model());
+        body.put("temperature", 0);
+        if (withSchema) {
+            body.put("messages", messages);
+            body.put("response_format", Map.of("type", "json_schema",
+                    "json_schema", Map.of("name", "answer", "schema", schema, "strict", false)));
+        } else {
+            String rules = "\n\nReply with a single JSON object only, matching this JSON schema:\n"
+                    + jsonMapper.writeValueAsString(schema);
+            body.put("messages", List.of(
+                    Map.of("role", "system", "content", messages.get(0).get("content") + rules),
+                    messages.get(1)));
+            body.put("response_format", Map.of("type", "json_object"));
+        }
+        return body;
     }
 
     /** Some models wrap JSON in ```json fences even when asked not to. */

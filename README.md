@@ -370,6 +370,7 @@ origin to `CORS_ALLOWED_ORIGINS`.
 | `JWT_SECRET` | yes | HMAC signing key, **at least 32 bytes**; startup fails if it is missing or too short |
 | `JWT_EXPIRATION_MINUTES` | no | Token lifetime, default `1440` (24 h) |
 | `CORS_ALLOWED_ORIGINS` | no | Comma-separated origins allowed to call the API, default `http://localhost:5173` |
+| `API_DOCS_ENABLED` | no | Swagger UI and `/v3/api-docs`, default `true`; set `false` on a public server |
 | `AI_PROVIDER` | no | `ollama` (default, local) or `openai` (an online OpenAI-compatible service) |
 | `OLLAMA_URL` / `OLLAMA_MODEL` | no | Local AI server and model, default `http://localhost:11434` / `qwen3:4b-instruct-2507-q4_K_M` |
 | `AI_API_KEY` / `AI_API_URL` / `AI_MODEL` | with `openai` | Online AI key, endpoint (default Groq) and model (default `openai/gpt-oss-20b`) |

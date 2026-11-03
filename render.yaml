@@ -26,6 +26,9 @@ services:
         value: https://codebyfarah.github.io
       - key: FRONTEND_URL
         value: https://codebyfarah.github.io/jobtracker
+      # Don't publish the Swagger UI / OpenAPI description on the public server.
+      - key: API_DOCS_ENABLED
+        value: "false"
       # Optional: Gmail tracking. Leave empty to run without it.
       - key: GOOGLE_CLIENT_ID
         sync: false

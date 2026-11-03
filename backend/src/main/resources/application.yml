@@ -66,10 +66,14 @@ jobtrack:
     # Key that encrypts the stored Gmail access. Falls back to JWT_SECRET; set its own in production.
     token-encryption-key: ${TOKEN_ENCRYPTION_KEY:}
 
+# API documentation (Swagger UI). On by default for development; set API_DOCS_ENABLED=false on a
+# public server so the API's structure isn't published.
 springdoc:
   api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
     path: /v3/api-docs
   swagger-ui:
+    enabled: ${API_DOCS_ENABLED:true}
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha

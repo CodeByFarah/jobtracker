@@ -6,11 +6,11 @@
 
 :root {
   color-scheme: light;
-  /* SF Pro on Apple devices, Inter (its closest open relative) everywhere else. */
-  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI Variable Text', 'Segoe UI',
-    'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI Variable Display',
-    'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  /* Geist for reading; Bricolage Grotesque, a little more characterful, for headlines and numbers. */
+  --font: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display',
+    'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 
   --bg: #f5f5f7;
   --surface: #ffffff;
@@ -621,18 +621,121 @@ a.app-row:hover::before, a.app-row:hover + .app-row::before { opacity: 0; }
 }
 
 /* ---------- Auth pages ---------- */
+/* Sign-in screens: the story panel (what JobTrack is) beside the form. */
 .auth-page {
-  min-height: 100vh; display: grid; place-items: center; padding: 48px 20px;
+  --story-ink: #0b1b33;
+  --story-ink-2: #3b4a63;
+  min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   background: var(--surface);
 }
-.auth-card { width: 100%; max-width: 400px; display: grid; gap: 8px; text-align: center; animation: rise 0.6s var(--ease) both; }
+.auth-story {
+  position: relative; overflow: hidden; isolation: isolate;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 48px;
+  padding: 40px clamp(32px, 5vw, 72px);
+  color: var(--story-ink);
+  background:
+    radial-gradient(60% 50% at 8% 0%, rgb(0 113 227 / 16%), transparent 70%),
+    radial-gradient(55% 45% at 100% 100%, rgb(0 170 200 / 14%), transparent 70%),
+    #f3f6fb;
+}
+/* A faint grid, fading out towards the bottom, gives the panel depth without noise. */
+.auth-story::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background-image:
+    linear-gradient(rgb(11 27 51 / 6%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(11 27 51 / 6%) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+}
+.auth-brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+.auth-pitch { max-width: 520px; }
+.auth-eyebrow {
+  display: inline-block; margin-bottom: 18px; padding: 5px 12px; border-radius: 999px;
+  background: rgb(255 255 255 / 70%); box-shadow: inset 0 0 0 1px rgb(11 27 51 / 8%);
+  color: var(--accent); font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+  animation: rise 0.6s var(--ease) both;
+}
+.auth-headline {
+  font-size: clamp(40px, 4.6vw, 62px); line-height: 1.02; font-weight: 700; letter-spacing: -0.035em;
+  color: var(--story-ink); animation: rise 0.6s 0.05s var(--ease) both;
+}
+.auth-headline em {
+  font-style: normal;
+  background: linear-gradient(100deg, #0071e3 10%, #00a3c4 90%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.auth-lede {
+  margin-top: 18px; max-width: 460px; color: var(--story-ink-2); font-size: 18px; line-height: 1.5;
+  animation: rise 0.6s 0.1s var(--ease) both;
+}
+
+/* The stages light up one after another, on a loop: the idea of the app in one glance. */
+.auth-pipeline {
+  list-style: none; margin: 32px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px;
+  animation: rise 0.6s 0.15s var(--ease) both;
+}
+.auth-pipeline li {
+  position: relative; display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  background: rgb(255 255 255 / 75%); color: var(--story-ink-2);
+  box-shadow: inset 0 0 0 1px rgb(11 27 51 / 8%), 0 1px 2px rgb(11 27 51 / 4%);
+  animation: stage-on 6s calc(var(--i) * 1.5s) infinite;
+}
+.auth-pipeline li:not(:last-child)::after {
+  content: ''; position: absolute; right: -8px; top: 50%; width: 8px; height: 1px; background: rgb(11 27 51 / 18%);
+}
+.auth-pipeline-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.35; }
+@keyframes stage-on {
+  /* Each stage is lit for a quarter of the loop, so exactly one glows at a time. */
+  0%, 25%, 100% { background: rgb(255 255 255 / 75%); color: var(--story-ink-2); }
+  4%, 21% { background: var(--accent); color: #fff; box-shadow: 0 6px 20px rgb(0 113 227 / 30%); }
+}
+
+.auth-points { list-style: none; margin: 40px 0 0; padding: 0; display: grid; gap: 20px; }
+.auth-points li {
+  display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start;
+  color: var(--story-ink-2); font-size: 15px; line-height: 1.5;
+  animation: rise 0.6s calc(0.25s + var(--i) * 0.08s) var(--ease) both;
+}
+.auth-points strong { display: block; color: var(--story-ink); font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+.auth-point-icon {
+  width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+  background: #fff; box-shadow: inset 0 0 0 1px rgb(11 27 51 / 8%), 0 4px 14px rgb(11 27 51 / 6%);
+  color: var(--accent);
+}
+.auth-point-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.auth-story-footer { display: flex; gap: 10px; color: var(--story-ink-2); font-size: 13px; }
+.auth-story-footer a { color: inherit; }
+.auth-story-footer a:hover { color: var(--accent); }
+
+.auth-main { display: grid; place-items: center; padding: 48px 24px; background: var(--surface); }
+.auth-card { width: 100%; max-width: 400px; display: grid; gap: 8px; text-align: center; animation: rise 0.6s 0.1s var(--ease) both; }
 .auth-logo { margin: 0 auto 18px; }
-.auth-card h1 { font-size: 40px; }
-.auth-subtitle { color: var(--text-3); font-size: 19px; }
+.auth-card h1 { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; }
+.auth-subtitle { color: var(--text-3); font-size: 18px; line-height: 1.45; }
 .auth-card .form { margin-top: 28px; text-align: left; }
 .auth-card .form .button { width: 100%; min-height: 46px; font-size: 17px; margin-top: 6px; }
 .auth-switch { margin-top: 24px; text-align: center; color: var(--text-3); font-size: 15px; }
+.auth-legal { margin-top: 28px; font-size: 13px; color: var(--text-3); }
+.auth-legal a { color: inherit; }
 .auth-page .field input { background: var(--surface); }
+
+/* Tablets and phones: the form first, then a shorter story underneath. */
+@media (max-width: 900px) {
+  .auth-page { grid-template-columns: 1fr; }
+  .auth-main { order: -1; padding: 40px 16px 32px; }
+  .auth-story { padding: 40px 20px 32px; gap: 32px; }
+  .auth-brand { display: none; }
+  .auth-headline { font-size: 36px; }
+  .auth-lede { font-size: 16px; }
+}
+@media (min-width: 901px) {
+  /* The story panel already shows the brand and the privacy link. */
+  .auth-logo, .auth-legal { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-pipeline li { animation: none; }
+}
 
 /* ---------- AI: job links, Gmail tracking ---------- */
 .detail-title { flex-wrap: wrap; }

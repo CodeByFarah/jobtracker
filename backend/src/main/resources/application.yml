@@ -50,6 +50,16 @@ jobtrack:
     # Empty = the provider's default (qwen3:4b-instruct for Ollama, openai/gpt-oss-20b online).
     model: ${AI_MODEL:${OLLAMA_MODEL:}}
     timeout: ${AI_TIMEOUT:${OLLAMA_TIMEOUT:PT3M}}
+  # Email for "forgot password" links. MAIL_PROVIDER: none (default, the feature says it's unavailable),
+  # brevo (HTTP API; needs MAIL_API_KEY and a verified MAIL_FROM_EMAIL), or log (prints to the server log;
+  # local development only).
+  mail:
+    provider: ${MAIL_PROVIDER:none}
+    api-key: ${MAIL_API_KEY:}
+    from-email: ${MAIL_FROM_EMAIL:}
+    from-name: ${MAIL_FROM_NAME:JobTrack}
+    # Where the link in the email points: the frontend's address.
+    app-url: ${FRONTEND_URL:http://localhost:5173}
   # Gmail integration (read-only). Leave the client id/secret empty to disable it.
   gmail:
     client-id: ${GOOGLE_CLIENT_ID:}

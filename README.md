@@ -113,6 +113,7 @@ indexes on `company_id` and `application_id`. The schema is built by the Flyway 
 - A resource that belongs to someone else returns **404 Not Found** rather than 403, so the API never confirms that another user's id exists.
 - Login failures return the same `401 Invalid email or password` whether or not the email exists. A dummy BCrypt comparison keeps the timing of the two cases similar.
 - **Logout** happens on the client: the frontend discards the token. JWTs are stateless and there is no server-side revocation list; that's an accepted trade-off for this project's scope.
+- **Changing a password** (`POST /api/users/me/password`, Profile page) needs the current one. **Forgot password** (`POST /api/auth/forgot-password`, then `POST /api/auth/reset-password`) emails a one-time link valid for 30 minutes; only a SHA-256 hash of the link's token is stored, the form answers the same whether or not the email has an account, and at most one link per account is sent per minute. Either way, tokens issued before the change are rejected (`PasswordChangeTokenValidator`), so every other device is signed out, and the caller gets a fresh token.
 - **Known trade-off:** the frontend keeps the token in `localStorage`. An `httpOnly` cookie would protect it better against XSS, but would require CSRF protection.
 - **Deleting an account** (`POST /api/users/me/delete`, Profile page) asks for the password, revokes JobTrack's Gmail access at Google, and removes every job, company, email record and logo of that account.
 
@@ -377,6 +378,8 @@ origin to `CORS_ALLOWED_ORIGINS`.
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | for Gmail | OAuth client from Google Cloud; Gmail tracking is off without them |
 | `GOOGLE_REDIRECT_URI` / `FRONTEND_URL` | in production | Public callback URL and app URL, default the local Vite server |
 | `TOKEN_ENCRYPTION_KEY` | in production | Encrypts stored Gmail access; defaults to a key derived from `JWT_SECRET` |
+| `MAIL_PROVIDER` | no | Email for "forgot password" links: `none` (default, the feature says it's unavailable), `brevo`, or `log` (prints the email to the server log; local development only) |
+| `MAIL_API_KEY` / `MAIL_FROM_EMAIL` / `MAIL_FROM_NAME` | with `brevo` | [Brevo](https://www.brevo.com) API key, a sender address verified in Brevo, and the sender name (default `JobTrack`) |
 | `GMAIL_SYNC_INTERVAL` / `GMAIL_SYNC_WORKERS` | no | Automatic check interval (default `PT30M`) and parallel checks per instance (default 1) |
 
 ## API documentation

@@ -4,6 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "users")
 public class User extends AuditableEntity {
@@ -23,7 +25,21 @@ public class User extends AuditableEntity {
 
     private String location;
 
+    /** When the password last changed; tokens issued before it are no longer accepted. */
+    @Column(name = "password_changed_at")
+    private Instant passwordChangedAt;
+
     protected User() {
+    }
+
+    /** Sets a new password (already hashed) and records when, which signs out older sessions. */
+    public void changePassword(String newPasswordHash, Instant changedAt) {
+        this.passwordHash = newPasswordHash;
+        this.passwordChangedAt = changedAt;
+    }
+
+    public Instant getPasswordChangedAt() {
+        return passwordChangedAt;
     }
 
     public User(String email, String passwordHash, String fullName) {

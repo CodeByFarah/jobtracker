@@ -68,9 +68,119 @@ export function ProfilePage() {
           </div>
         </form>
       </section>
+      <ChangePasswordCard />
       <GmailCard />
       <DeleteAccountCard />
     </>
+  )
+}
+
+/** Changes the password. Other devices are signed out; this one gets a fresh session. */
+function ChangePasswordCard() {
+  const { acceptSession } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [done, setDone] = useState(false)
+  const { submitting, formError, fieldErrors, setFieldErrors, run } = useSubmit()
+
+  function close() {
+    setOpen(false)
+    setCurrent('')
+    setNext('')
+    setConfirm('')
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    if (next.length < 8) {
+      setFieldErrors({ newPassword: 'Use at least 8 characters' })
+      return
+    }
+    if (next !== confirm) {
+      setFieldErrors({ confirm: 'Passwords do not match' })
+      return
+    }
+    run(async () => {
+      acceptSession(await userApi.changePassword({ currentPassword: current, newPassword: next }))
+      close()
+      setDone(true)
+    })
+  }
+
+  return (
+    <section className="card narrow-card" aria-labelledby="password-heading">
+      <header className="section-header">
+        <h2 id="password-heading">Password</h2>
+      </header>
+      {open ? (
+        <form className="form" onSubmit={submit} noValidate>
+          {formError && <p className="form-error" role="alert">{formError}</p>}
+          <FormField label="Current password" required error={fieldErrors.currentPassword}>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              required
+              autoFocus
+            />
+          </FormField>
+          <FormField label="New password" required error={fieldErrors.newPassword} hint="At least 8 characters">
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              required
+              minLength={8}
+              maxLength={72}
+            />
+          </FormField>
+          <FormField label="Confirm new password" required error={fieldErrors.confirm}>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+            />
+          </FormField>
+          <div className="form-actions">
+            <button type="submit" className="button button-primary" disabled={submitting || !current}>
+              {submitting ? 'Saving…' : 'Change password'}
+            </button>
+            <button type="button" className="button button-ghost" onClick={close} disabled={submitting}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p className="muted gmail-intro">
+            Changing your password signs you out on every other device.
+          </p>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => {
+                setDone(false)
+                setOpen(true)
+              }}
+            >
+              Change password…
+            </button>
+            {done && (
+              <span className="text-success" role="status">
+                Password changed
+              </span>
+            )}
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 

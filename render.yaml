@@ -42,3 +42,11 @@ services:
         value: openai
       - key: AI_API_KEY
         sync: false
+      # Optional: "forgot password" emails through Brevo's HTTP API (Render's free plan blocks SMTP).
+      # Set MAIL_PROVIDER=brevo plus the key and a sender address verified in Brevo.
+      - key: MAIL_PROVIDER
+        sync: false
+      - key: MAIL_API_KEY
+        sync: false
+      - key: MAIL_FROM_EMAIL
+        sync: false

@@ -23,6 +23,9 @@ export const authApi = {
   register: (body: { email: string; password: string; fullName: string }) =>
     http.post<AuthResponse>('/api/auth/register', body),
   login: (body: { email: string; password: string }) => http.post<AuthResponse>('/api/auth/login', body),
+  forgotPassword: (email: string) => http.post<void>('/api/auth/forgot-password', { email }),
+  resetPassword: (body: { token: string; newPassword: string }) =>
+    http.post<AuthResponse>('/api/auth/reset-password', body),
 }
 
 export const userApi = {
@@ -30,6 +33,8 @@ export const userApi = {
   update: (body: { fullName: string; headline: string | null; location: string | null }) =>
     http.put<User>('/api/users/me', body),
   deleteAccount: (password: string) => http.post<void>('/api/users/me/delete', { password }),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    http.post<AuthResponse>('/api/users/me/password', body),
 }
 
 export const companyApi = {

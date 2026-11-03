@@ -1,9 +1,12 @@
 package com.jobtrack.controller;
 
 import com.jobtrack.dto.auth.AuthResponse;
+import com.jobtrack.dto.auth.ForgotPasswordRequest;
 import com.jobtrack.dto.auth.LoginRequest;
 import com.jobtrack.dto.auth.RegisterRequest;
+import com.jobtrack.dto.auth.ResetPasswordRequest;
 import com.jobtrack.service.AuthService;
+import com.jobtrack.service.PasswordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -18,14 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "Authentication", description = "Register and log in. These are the only public endpoints.")
+@Tag(name = "Authentication", description = "Register, log in and reset a forgotten password. These endpoints are public.")
 @SecurityRequirements // public: no bearer token required
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordService passwordService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, PasswordService passwordService) {
         this.authService = authService;
+        this.passwordService = passwordService;
     }
 
     @PostMapping("/register")
@@ -46,5 +51,25 @@ public class AuthController {
     @ApiResponse(responseCode = "401", description = "Invalid email or password")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Email a password reset link", description = """
+            Sends a one-time link (valid 30 minutes) if an account has this email. The answer is the \
+            same whether or not the account exists.""")
+    @ApiResponse(responseCode = "204", description = "Handled (an email is sent if the account exists)")
+    @ApiResponse(responseCode = "409", description = "Email isn't set up on this server")
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordService.requestReset(request.email());
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Set a new password with a reset link",
+            description = "Signs out other devices and returns an access token, so the user is logged in.")
+    @ApiResponse(responseCode = "200", description = "Password changed")
+    @ApiResponse(responseCode = "400", description = "Link expired, already used, or the password is too short")
+    public AuthResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return passwordService.resetPassword(request.token(), request.newPassword());
     }
 }

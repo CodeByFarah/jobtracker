@@ -41,6 +41,9 @@ export function LoginPage() {
             required
           />
         </FormField>
+        <p className="field-hint" style={{ marginTop: -4, textAlign: 'right' }}>
+          <Link to="/forgot-password">Forgot your password?</Link>
+        </p>
         <button type="submit" className="button button-primary button-block" disabled={submitting}>
           {submitting ? 'Logging in…' : 'Log in'}
         </button>

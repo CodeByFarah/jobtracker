@@ -7,6 +7,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /** Enables the AI/Gmail settings and the scheduler that runs the periodic Gmail sync. */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
-@EnableConfigurationProperties({AiProperties.class, GmailProperties.class})
+@EnableConfigurationProperties({AiProperties.class, GmailProperties.class, MailProperties.class})
 public class AiConfig {
 }

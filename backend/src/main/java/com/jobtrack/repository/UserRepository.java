@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -13,6 +14,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);
+
+    /** Checked on every request: tokens issued before this moment are rejected. */
+    @Query("SELECT u.passwordChangedAt FROM User u WHERE u.id = :userId")
+    Optional<Instant> findPasswordChangedAt(@Param("userId") Long userId);
 
     /**
      * Applications first (companies can't be deleted while applications point at them); their

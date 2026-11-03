@@ -11,6 +11,8 @@ interface AuthContextValue {
   register: (email: string, password: string, fullName: string) => Promise<void>
   logout: () => void
   setUser: (user: User) => void
+  /** Starts a session from a fresh token (after a password change or reset). */
+  acceptSession: (response: AuthResponse) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -56,8 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const value = useMemo(
-    () => ({ user, initializing, login, register, logout, setUser }),
-    [user, initializing, login, register, logout],
+    () => ({ user, initializing, login, register, logout, setUser, acceptSession }),
+    [user, initializing, login, register, logout, acceptSession],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

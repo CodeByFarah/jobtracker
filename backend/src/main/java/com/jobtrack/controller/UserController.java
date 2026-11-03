@@ -1,9 +1,12 @@
 package com.jobtrack.controller;
 
+import com.jobtrack.dto.auth.AuthResponse;
+import com.jobtrack.dto.user.ChangePasswordRequest;
 import com.jobtrack.dto.user.DeleteAccountRequest;
 import com.jobtrack.dto.user.UpdateProfileRequest;
 import com.jobtrack.dto.user.UserResponse;
 import com.jobtrack.security.CurrentUser;
+import com.jobtrack.service.PasswordService;
 import com.jobtrack.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,10 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final PasswordService passwordService;
     private final CurrentUser currentUser;
 
-    public UserController(UserService userService, CurrentUser currentUser) {
+    public UserController(UserService userService, PasswordService passwordService, CurrentUser currentUser) {
         this.userService = userService;
+        this.passwordService = passwordService;
         this.currentUser = currentUser;
     }
 
@@ -42,6 +47,15 @@ public class UserController {
     @ApiResponse(responseCode = "400", description = "Validation failed")
     public UserResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         return userService.updateProfile(currentUser.id(), request);
+    }
+
+    @PostMapping("/password")
+    @Operation(summary = "Change my password", description = "Requires the current password. Signs out other "
+            + "devices and returns a new access token for this one.")
+    @ApiResponse(responseCode = "200", description = "Password changed")
+    @ApiResponse(responseCode = "400", description = "Wrong current password, or the new one is too short")
+    public AuthResponse changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        return passwordService.changePassword(currentUser.id(), request.currentPassword(), request.newPassword());
     }
 
     @PostMapping("/delete")

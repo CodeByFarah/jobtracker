@@ -7,6 +7,8 @@ import { ApplicationsPage } from './pages/ApplicationsPage'
 import { CompaniesPage } from './pages/CompaniesPage'
 import { CompanyDetailPage } from './pages/CompanyDetailPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { InterviewsPage } from './pages/InterviewsPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -20,9 +22,12 @@ export default function App() {
       <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
         <Routes>
           <Route path="/gmail/done" element={<GmailDonePage />} />
+          {/* Works logged in or out: the emailed link is what proves who you are. */}
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<PublicOnly />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           </Route>
           <Route element={<RequireAuth />}>
             <Route element={<Layout />}>

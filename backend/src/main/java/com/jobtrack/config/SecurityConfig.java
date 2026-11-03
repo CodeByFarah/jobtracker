@@ -1,6 +1,9 @@
 package com.jobtrack.config;
 
+import com.jobtrack.repository.UserRepository;
 import com.jobtrack.security.JsonSecurityErrorHandler;
+import com.jobtrack.security.PasswordChangeTokenValidator;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -46,7 +49,8 @@ public class SecurityConfig {
                 })
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login",
+                                "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
                         // Google redirects the browser here; the signed OAuth state identifies the user.
                         .requestMatchers(HttpMethod.GET, "/api/gmail/oauth/callback").permitAll()
                         .requestMatchers(PUBLIC_DOCS).permitAll()
@@ -79,12 +83,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey jwtSigningKey, JwtProperties properties) {
+    JwtDecoder jwtDecoder(SecretKey jwtSigningKey, JwtProperties properties, UserRepository userRepository) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSigningKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
-        // Verifies signature, expiry/not-before and that we issued the token.
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(properties.issuer()));
+        // Verifies signature, expiry/not-before and that we issued the token, and that it isn't
+        // older than the account's last password change.
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(properties.issuer()),
+                new PasswordChangeTokenValidator(userRepository)));
         return decoder;
     }
 

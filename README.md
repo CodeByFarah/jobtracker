@@ -173,11 +173,12 @@ one person. A fresh install has no data at all.
 
 More detail and the reasoning behind these choices: [docs/engineering-decisions.md](docs/engineering-decisions.md).
 
-## AI features (local and free)
+## AI features (local and free, or online)
 
-Two features use a small open-source model, **Qwen3-4B**, running on your own machine through
-[Ollama](https://ollama.com). There is no API key, no per-request cost, and job pages and emails
-never go to a third-party AI service.
+Two features use an AI model. By default it is a small open-source model, **Qwen3-4B**, running on
+your own machine through [Ollama](https://ollama.com): no API key, no per-request cost, and job pages
+and emails never go to a third-party AI service. A server that can't run a local model (like the free
+hosted demo) can use an online model instead; see *Using an online AI* below.
 
 - **Add from link.** Paste a job posting URL and the form fills itself in: title, company, location,
   employment type, salary and a short summary. Most job boards embed a schema.org `JobPosting`
@@ -226,6 +227,14 @@ laptop CPU; unrelated emails are skipped before they reach the AI.
 2. `ollama pull qwen3:4b-instruct-2507-q4_K_M` (2.5 GB).
 3. Optional: point to another model or server with `OLLAMA_MODEL` / `OLLAMA_URL` in `.env`.
 
+### Using an online AI
+
+For a server without a local model, set `AI_PROVIDER=openai` and `AI_API_KEY`. Any service with an
+OpenAI-compatible chat API works; the default is [Groq](https://groq.com) with `openai/gpt-oss-20b`
+(a few cents for a first Gmail check). Pick another with `AI_API_URL` and `AI_MODEL`, for example
+`https://api.openai.com/v1`. The prompts, the JSON schemas and every rule stay the same; only where
+the model runs changes. Use a paid key whose terms don't train on your data: these are people's emails.
+
 ### Setting up Gmail (one-time, ~10 minutes)
 
 Gmail access needs an OAuth client of your own in Google Cloud. It is free.
@@ -272,6 +281,32 @@ No local database or configuration is needed.
 | Integration tests (`@SpringBootTest` + MockMvc + Testcontainers) | The full acceptance workflow (register → … → dashboard → search). User A vs. user B on every resource type. Page size, page number and filters combined with pagination. Sorting. Validation and error bodies. Transaction rollback when the history insert fails. |
 
 152 tests; all pass (plus the opt-in live tests: real AI with `-Dollama.live=true`, real company logos with `-Dlogos.live=true`).
+
+## Self-hosting (everything on your own computer)
+
+Run the whole app, the database and the local AI with one command. Your emails are read on your
+machine and never go to an AI service. You need [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+and about 8 GB of RAM (the AI model uses 4-5 GB).
+
+1. **Get the code:** `git clone https://github.com/CodeByFarah/jobtracker.git` and `cd jobtracker`.
+2. **Configure:** copy `.env.example` to `.env`, then set `DATABASE_PASSWORD` (any password) and
+   `JWT_SECRET` (a random string of at least 32 characters, e.g. `openssl rand -base64 48`).
+3. **Gmail (optional):** follow *Setting up Gmail* above to make your own free Google key, with the
+   redirect URI `http://localhost:5173/api/gmail/oauth/callback`, and put it in `.env` as
+   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Because the key is yours, there is no
+   "unverified app" limit for you.
+4. **Start:**
+
+   ```bash
+   docker compose -f docker-compose.selfhost.yml up -d --build
+   ```
+
+   The first start downloads the AI model (2.5 GB) and builds the app, so it takes a few minutes.
+5. **Open** <http://localhost:5173> and create your account.
+
+Stop it with `docker compose -f docker-compose.selfhost.yml down`. Your data stays in Docker volumes
+and is there next time. Have an NVIDIA GPU? Uncomment the `deploy` block in
+`docker-compose.selfhost.yml` to make the AI much faster.
 
 ## Setup
 
@@ -334,7 +369,9 @@ origin to `CORS_ALLOWED_ORIGINS`.
 | `JWT_SECRET` | yes | HMAC signing key, **at least 32 bytes**; startup fails if it is missing or too short |
 | `JWT_EXPIRATION_MINUTES` | no | Token lifetime, default `1440` (24 h) |
 | `CORS_ALLOWED_ORIGINS` | no | Comma-separated origins allowed to call the API, default `http://localhost:5173` |
-| `OLLAMA_URL` / `OLLAMA_MODEL` | no | AI server and model, default `http://localhost:11434` / `qwen3:4b-instruct-2507-q4_K_M` |
+| `AI_PROVIDER` | no | `ollama` (default, local) or `openai` (an online OpenAI-compatible service) |
+| `OLLAMA_URL` / `OLLAMA_MODEL` | no | Local AI server and model, default `http://localhost:11434` / `qwen3:4b-instruct-2507-q4_K_M` |
+| `AI_API_KEY` / `AI_API_URL` / `AI_MODEL` | with `openai` | Online AI key, endpoint (default Groq) and model (default `openai/gpt-oss-20b`) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | for Gmail | OAuth client from Google Cloud; Gmail tracking is off without them |
 | `GOOGLE_REDIRECT_URI` / `FRONTEND_URL` | in production | Public callback URL and app URL, default the local Vite server |
 | `TOKEN_ENCRYPTION_KEY` | in production | Encrypts stored Gmail access; defaults to a key derived from `JWT_SECRET` |

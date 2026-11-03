@@ -35,7 +35,7 @@ class EmailClassifierLiveTest {
     private static final JobApplication INITECH = app(30, "Initech", "Data Analyst");
 
     private final EmailClassifier classifier = new EmailClassifier(
-            new OllamaClient(new AiProperties(null, null, null), JsonMapper.builder().build()));
+            new OllamaClient(new AiProperties(null, null, null, null, null, null), JsonMapper.builder().build()));
 
     private static JobApplication app(long id, String company, String title) {
         JobApplication application = TestEntities.application(id, USER, TestEntities.company(id, USER, company),

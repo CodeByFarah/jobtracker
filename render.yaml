@@ -34,3 +34,8 @@ services:
       # https://<this service>.onrender.com/api/gmail/oauth/callback, also registered in Google Cloud.
       - key: GOOGLE_REDIRECT_URI
         sync: false
+      # The free plan can't run a local model, so the AI runs online (Groq by default).
+      - key: AI_PROVIDER
+        value: openai
+      - key: AI_API_KEY
+        sync: false

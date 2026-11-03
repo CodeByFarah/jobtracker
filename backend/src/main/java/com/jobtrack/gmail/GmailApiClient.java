@@ -59,7 +59,10 @@ public class GmailApiClient {
     public record Tokens(String accessToken, String refreshToken, long expiresInSeconds) {
     }
 
-    /** Google's consent page. {@code prompt=consent} makes Google return a refresh token every time. */
+    /**
+     * Google's consent page. {@code select_account} shows the account chooser; {@code consent} makes
+     * Google return a refresh token every time.
+     */
     public String authorizationUrl(String state) {
         return UriComponentsBuilder.fromUriString(AUTH_URL)
                 .queryParam("client_id", properties.clientId())
@@ -67,7 +70,9 @@ public class GmailApiClient {
                 .queryParam("response_type", "code")
                 .queryParam("scope", SCOPE)
                 .queryParam("access_type", "offline")
-                .queryParam("prompt", "consent")
+                // Always ask which Google account to use, so people can pick the mailbox they mean
+                // instead of Google silently choosing the one they're signed in with.
+                .queryParam("prompt", "select_account consent")
                 .queryParam("state", state)
                 .encode()
                 .build()

@@ -76,6 +76,25 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
               </li>
             ))}
           </ul>
+
+          <a
+            className="auth-selfhost"
+            href="https://github.com/CodeByFarah/jobtracker#self-hosting-everything-on-your-own-computer"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="auth-selfhost-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="12" rx="2" />
+                <path d="M8 20h8M12 16v4" />
+              </svg>
+            </span>
+            <span>
+              <strong>Want it 100% private? Run it on your own computer.</strong>
+              The app, the database and the AI, with one Docker command. Your emails never leave your machine.
+              <span className="auth-selfhost-cta">Self-hosting guide →</span>
+            </span>
+          </a>
         </div>
 
         <footer className="auth-story-footer">

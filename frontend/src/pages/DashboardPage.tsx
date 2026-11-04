@@ -37,6 +37,9 @@ export function DashboardPage() {
     <>
       <header className="page-header">
         <div>
+          <p className="page-eyebrow">
+            {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
           <h1>{firstName ? `Hi, ${firstName}` : 'Dashboard'}</h1>
           <p className="muted">Here’s where your job search stands.</p>
         </div>
@@ -74,16 +77,20 @@ export function DashboardPage() {
               value={d.totalApplications}
               detail={`${d.applicationsThisMonth} this month`}
               to="/applications"
+              icon="briefcase"
+              color="#0071e3"
             />
-            <StatCard label="Active" value={d.activeApplications} detail="Applied → offer stage" />
+            <StatCard label="Active" value={d.activeApplications} detail="Applied → offer stage" icon="pulse" color="#00a3c4" />
             <StatCard
               label="Interviews"
               value={d.totalInterviews}
               detail={`${d.upcomingInterviewCount} upcoming`}
               to="/interviews"
+              icon="calendar"
+              color="#8944ab"
             />
-            <StatCard label="Offers" value={d.offers} to="/applications?status=OFFER" />
-            <StatCard label="Rejected" value={d.rejected} to="/applications?status=REJECTED" />
+            <StatCard label="Offers" value={d.offers} to="/applications?status=OFFER" icon="award" color="#c25a00" />
+            <StatCard label="Rejected" value={d.rejected} to="/applications?status=REJECTED" icon="xCircle" color="#d70015" />
           </section>
 
           {gmail.data?.connected && (

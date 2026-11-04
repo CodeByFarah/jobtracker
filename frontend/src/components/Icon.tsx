@@ -25,6 +25,9 @@ const PATHS = {
   link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
   mail: 'M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3.5 7l8.5 6 8.5-6',
   refresh: 'M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4',
+  pulse: 'M3 12h4l3-7 4 14 3-7h4',
+  award: 'M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8.6 14.1 7 21l5-3 5 3-1.6-6.9',
+  xCircle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15 9l-6 6M9 9l6 6',
 } as const
 
 export type IconName = keyof typeof PATHS
